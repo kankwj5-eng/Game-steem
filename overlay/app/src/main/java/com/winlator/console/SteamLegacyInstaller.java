@@ -408,11 +408,13 @@ public final class SteamLegacyInstaller {
                             publish(Phase.EXTRACTING, detail, uiPct, extracted, index.uncompressedBytes, name);
                         }
                     }
-                    out.getFD().sync();
+                    // Closing the stream is enough here. fsync() per extracted file made the
+                    // 6k+ entry Steam package dramatically slower on Android flash storage.
                 }
             }
         }
 
+        ConsoleLogStore.flush();
         ConsoleLogStore.ok("EXTRACCIÓN COMPLETA · " + formatBytes(extracted));
     }
 
