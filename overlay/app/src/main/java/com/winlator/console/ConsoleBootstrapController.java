@@ -326,7 +326,7 @@ public final class ConsoleBootstrapController {
         connection.setConnectTimeout(15_000);
         connection.setReadTimeout(60_000);
         connection.setInstanceFollowRedirects(true);
-        connection.setRequestProperty("User-Agent", "DroidDeck/0.5 Android");
+        connection.setRequestProperty("User-Agent", "DroidDeck/0.6 Android");
         if (existing > 0) connection.setRequestProperty("Range", "bytes=" + existing + "-");
         connection.connect();
 
@@ -411,10 +411,10 @@ public final class ConsoleBootstrapController {
 
         installerStarted = true;
         pendingAutoLaunch = false;
-        update("steam", "Steam", "Instalando automáticamente · C:\\DroidDeck\\SteamSetup.exe", BootstrapStep.State.RUNNING, 98);
+        update("steam", "Steam", "Instalando automáticamente en C:\\Steam", BootstrapStep.State.RUNNING, 98);
         ConsoleLogStore.ok("Instalador listo · " + formatBytes(installer.length()) + " · " + dosPath);
-        ConsoleLogStore.info("Ejecutando " + dosPath + " /S dentro de Wine.");
-        launchWindowsExecutable(installer, "/S", "steam_install");
+        ConsoleLogStore.info("Ejecutando " + dosPath + " /S /D=C:\\Steam dentro de Wine.");
+        launchWindowsExecutable(installer, "/S /D=C:\\Steam", "steam_install");
     }
 
     private void launchWindowsExecutable(File executable, String args, String purpose) {
@@ -485,6 +485,14 @@ public final class ConsoleBootstrapController {
         if (attempt >= 120) {
             installerStarted = false;
             pendingAutoLaunch = false;
+            File deep = findSteamExecutableDeep(steamContainer);
+            if (deep != null) {
+                ConsoleLogStore.ok("steam.exe localizado por búsqueda profunda: " + deep.getAbsolutePath());
+                update("steam", "Steam", "Instalación completada", BootstrapStep.State.DONE, 100);
+                update("launch", "Inicio", "Todo listo · inicia Steam cuando quieras", BootstrapStep.State.WAITING, 0);
+                listener.onReady(true);
+                return;
+            }
             logSteamDirectoryState();
             fail("steam", "SteamSetup terminó, pero steam.exe no apareció después de 60 s");
             return;
@@ -503,10 +511,14 @@ public final class ConsoleBootstrapController {
 
     private void logSteamDirectoryState() {
         if (steamContainer == null) return;
-        File programFiles = new File(steamContainer.getRootDir(), ".wine/drive_c/Program Files (x86)");
-        File programFiles64 = new File(steamContainer.getRootDir(), ".wine/drive_c/Program Files");
-        ConsoleLogStore.warn("Inspección de C:\\Program Files (x86): " + listNames(programFiles));
-        ConsoleLogStore.warn("Inspección de C:\\Program Files: " + listNames(programFiles64));
+        File driveC = new File(steamContainer.getRootDir(), ".wine/drive_c");
+        File steamRoot = new File(driveC, "Steam");
+        File programFiles = new File(driveC, "Program Files (x86)");
+        File programFiles64 = new File(driveC, "Program Files");
+        ConsoleLogStore.warn("Inspección C:\\: " + listNames(driveC));
+        ConsoleLogStore.warn("Inspección C:\\Steam: " + listNames(steamRoot));
+        ConsoleLogStore.warn("Inspección C:\\Program Files (x86): " + listNames(programFiles));
+        ConsoleLogStore.warn("Inspección C:\\Program Files: " + listNames(programFiles64));
     }
 
     private String listNames(File dir) {
@@ -525,12 +537,40 @@ public final class ConsoleBootstrapController {
     private File findSteamExecutable(Container container) {
         if (container == null) return null;
         String[] paths = {
+                ".wine/drive_c/Steam/steam.exe",
                 ".wine/drive_c/Program Files (x86)/Steam/steam.exe",
-                ".wine/drive_c/Program Files/Steam/steam.exe"
+                ".wine/drive_c/Program Files/Steam/steam.exe",
+                ".wine/drive_c/users/xuser/AppData/Local/Steam/steam.exe"
         };
         for (String path : paths) {
             File f = new File(container.getRootDir(), path);
             if (f.isFile()) return f;
+        }
+        return null;
+    }
+
+    private File findSteamExecutableDeep(Container container) {
+        File direct = findSteamExecutable(container);
+        if (direct != null) return direct;
+        File driveC = new File(container.getRootDir(), ".wine/drive_c");
+        return findSteamRecursive(driveC, 0);
+    }
+
+    private File findSteamRecursive(File dir, int depth) {
+        if (dir == null || !dir.isDirectory() || depth > 7) return null;
+        String name = dir.getName();
+        if ("windows".equalsIgnoreCase(name) || "$Recycle.Bin".equalsIgnoreCase(name)) return null;
+
+        File[] children = dir.listFiles();
+        if (children == null) return null;
+        for (File child : children) {
+            if (child.isFile() && "steam.exe".equalsIgnoreCase(child.getName())) return child;
+        }
+        for (File child : children) {
+            if (child.isDirectory()) {
+                File found = findSteamRecursive(child, depth + 1);
+                if (found != null) return found;
+            }
         }
         return null;
     }
