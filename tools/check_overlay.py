@@ -74,7 +74,7 @@ for token in [
     "startInstallerSession",
     "stopInstallerSession",
     "EXPECTED_SHA256",
-    "FOREGROUND",
+    "ForegroundService",
 ]:
     if token not in installer:
         raise SystemExit(f"instalador Steam Legacy incompleto: falta {token}")
