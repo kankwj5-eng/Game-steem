@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout Game-steem
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -51,17 +51,17 @@ jobs:
 
       - name: Verify critical wiring
         run: |
-          grep -q 'com.winlator.ConsoleLauncherActivity' winlator-app/app/src/main/AndroidManifest.xml
-          grep -q 'android:requestLegacyExternalStorage="true"' winlator-app/app/src/main/AndroidManifest.xml
-          grep -q "applicationId 'com.droiddeck.console'" winlator-app/app/build.gradle
-          grep -q 'droidDeckConsoleMode' winlator-app/app/src/main/java/com/winlator/XServerDisplayActivity.java
-          grep -q 'intent.getStringExtra("exec_args")' winlator-app/app/src/main/java/com/winlator/XServerDisplayActivity.java
-          grep -q 'InstallProgressListener' winlator-app/app/src/main/java/com/winlator/xenvironment/RootFSInstaller.java
-          grep -q 'C:\\DroidDeck\\SteamSetup.exe' winlator-app/app/src/main/java/com/winlator/console/ConsoleBootstrapController.java
-          grep -q '/data/data/com.droiddeck.console/' winlator-app/app/src/main/cpp/vortekrenderer/include/vortek.h
-          grep -q '/data/data/com.droiddeck.console/' winlator-app/app/src/main/cpp/gladiorenderer/include/gladio.h
-          ! grep -R '/data/data/com.winlator/' winlator-app/app/src/main/cpp/winlator/include winlator-app/app/src/main/cpp/vortekrenderer/include/vortek.h winlator-app/app/src/main/cpp/gladiorenderer/include/gladio.h
-          ! grep -q '/data/data/com.winlator/storage' winlator-app/app/src/main/java/com/winlator/core/AppUtils.java
+          grep -Fq 'com.winlator.ConsoleLauncherActivity' winlator-app/app/src/main/AndroidManifest.xml
+          grep -Fq 'android:requestLegacyExternalStorage="true"' winlator-app/app/src/main/AndroidManifest.xml
+          grep -Fq "applicationId 'com.droiddeck.console'" winlator-app/app/build.gradle
+          grep -Fq 'droidDeckConsoleMode' winlator-app/app/src/main/java/com/winlator/XServerDisplayActivity.java
+          grep -Fq 'intent.getStringExtra("exec_args")' winlator-app/app/src/main/java/com/winlator/XServerDisplayActivity.java
+          grep -Fq 'InstallProgressListener' winlator-app/app/src/main/java/com/winlator/xenvironment/RootFSInstaller.java
+          grep -Fq 'C:\\DroidDeck\\SteamSetup.exe' winlator-app/app/src/main/java/com/winlator/console/ConsoleBootstrapController.java
+          grep -Fq '/data/data/com.droiddeck.console/' winlator-app/app/src/main/cpp/vortekrenderer/include/vortek.h
+          grep -Fq '/data/data/com.droiddeck.console/' winlator-app/app/src/main/cpp/gladiorenderer/include/gladio.h
+          ! grep -RF '/data/data/com.winlator/' winlator-app/app/src/main/cpp/winlator/include winlator-app/app/src/main/cpp/vortekrenderer/include/vortek.h winlator-app/app/src/main/cpp/gladiorenderer/include/gladio.h
+          ! grep -Fq '/data/data/com.winlator/storage' winlator-app/app/src/main/java/com/winlator/core/AppUtils.java
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -83,7 +83,7 @@ jobs:
           APK=winlator-app/app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | tee apk-badging.txt
-          grep -q "package: name='com.droiddeck.console'" apk-badging.txt
+          grep -Fq "package: name='com.droiddeck.console'" apk-badging.txt
 
       - name: Package APK
         run: |
