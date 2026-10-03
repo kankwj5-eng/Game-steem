@@ -31,7 +31,7 @@ activity = (root / "overlay/app/src/main/java/com/winlator/ConsoleLauncherActivi
 
 for token in [
     "SteamSetup.exe",
-    '"/S"',
+    '"/S /D=C:\\\\Steam"',
     "Range",
     "formatSpeed",
     "handleRuntimeResult",
