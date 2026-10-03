@@ -198,18 +198,36 @@ u_bit_scan_consecutive_range(unsigned *mask, int *start, int *count)
     )
 
     # 6) Do not let pNext in a caller-owned VkMemoryAllocateInfo escape pointing at stack locals.
+    resource_memory = cpp / "vortekrenderer/src/resource_memory.c"
     replace_once(
-        cpp / "vortekrenderer/src/resource_memory.c",
+        resource_memory,
         """ResourceMemory* ResourceMemory_allocate(VkContext* context, VkDevice device, VkMemoryAllocateInfo* memoryInfo) {
     uint64_t maxAllocationSize = (VkDeviceSize)context->maxDeviceMemory << 20;""",
         """ResourceMemory* ResourceMemory_allocate(VkContext* context, VkDevice device, VkMemoryAllocateInfo* memoryInfo) {
     if (!memoryInfo) return NULL;
 
     VkMemoryAllocateInfo localMemoryInfo = *memoryInfo;
-    memoryInfo = &localMemoryInfo;
+    VkMemoryAllocateInfo* allocationInfo = &localMemoryInfo;
 
     uint64_t maxAllocationSize = (VkDeviceSize)context->maxDeviceMemory << 20;""",
         "Vulkan pNext stack lifetime",
+    )
+
+    resource_text = resource_memory.read_text(encoding="utf-8")
+    start = resource_text.index("ResourceMemory* ResourceMemory_allocate")
+    end = resource_text.index("\nvoid ResourceMemory_free", start)
+    region = resource_text[start:end]
+    original_region = region
+    region = region.replace("memoryInfo->", "allocationInfo->")
+    region = region.replace(
+        "vkAllocateMemory(device, memoryInfo,",
+        "vkAllocateMemory(device, allocationInfo,",
+    )
+    if region == original_region:
+        raise SystemExit("security fix no aplicado (Vulkan allocationInfo): sin reemplazos")
+    resource_memory.write_text(
+        resource_text[:start] + region + resource_text[end:],
+        encoding="utf-8",
     )
 
     # 7) Async semaphore request owns both the duplicated input and request object.
