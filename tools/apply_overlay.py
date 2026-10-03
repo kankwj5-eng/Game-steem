@@ -226,6 +226,146 @@ if 'intent.getStringExtra("exec_args")' not in xtext:
         raise SystemExit("bloque exec_path esperado no encontrado en XServerDisplayActivity")
     xtext = xtext.replace(old_exec, new_exec)
 
+
+# DroidDeck runtime telemetry: hide Winlator preloaders and expose real milestones.
+xtext = xtext.replace(
+    "                preloaderDialog.show(R.string.updating_system_files);",
+    "                if (droidDeckConsoleMode && droidDeckRuntimeOverlay != null) {\n"
+    "                    droidDeckRuntimeOverlay.stage(\"Wine\", \"Actualizando prefijo de Windows\", 14);\n"
+    "                }\n"
+    "                else preloaderDialog.show(R.string.updating_system_files);"
+)
+
+xtext = xtext.replace(
+    "        preloaderDialog.show(R.string.starting_up);",
+    "        if (droidDeckConsoleMode && droidDeckRuntimeOverlay != null) {\n"
+    "            droidDeckRuntimeOverlay.stage(\"Motor\", \"Inicializando servidor gráfico\", 12);\n"
+    "        }\n"
+    "        else preloaderDialog.show(R.string.starting_up);"
+)
+
+xtext = xtext.replace(
+    "                    xServerView.getRenderer().setCursorVisible(true);\n"
+    "                    preloaderDialog.closeOnUiThread();\n"
+    "                    flags[0] = true;",
+    "                    xServerView.getRenderer().setCursorVisible(true);\n"
+    "                    if (droidDeckConsoleMode && droidDeckRuntimeOverlay != null) {\n"
+    "                        droidDeckRuntimeOverlay.ready(\"Ventana de Steam lista\");\n"
+    "                    }\n"
+    "                    else preloaderDialog.closeOnUiThread();\n"
+    "                    flags[0] = true;"
+)
+
+xtext = xtext.replace(
+    "            if (!isGenerateWineprefix()) {\n"
+    "                setupWineSystemFiles();\n"
+    "                extractGraphicsDriverFiles();\n"
+    "                changeWineAudioDriver();\n"
+    "            }\n"
+    "            setupXEnvironment();",
+    "            if (!isGenerateWineprefix()) {\n"
+    "                if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\"Wine\", \"Preparando registro, DLL y prefijo\", 18);\n"
+    "                setupWineSystemFiles();\n"
+    "                if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\"Wine\", \"Wine y prefijo listos\", 42);\n"
+    "                if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\"Gráficos\", \"Preparando Vortek / Gladio\", 43);\n"
+    "                extractGraphicsDriverFiles();\n"
+    "                if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\"Gráficos\", \"Controlador gráfico listo\", 64);\n"
+    "                if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\"Audio\", \"Configurando audio de Wine\", 65);\n"
+    "                changeWineAudioDriver();\n"
+    "                if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\"Audio\", \"Audio listo\", 72);\n"
+    "            }\n"
+    "            if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\"Runtime\", \"Creando entorno Linux / Windows\", 73);\n"
+    "            setupXEnvironment();"
+)
+
+xtext = xtext.replace(
+    "    private void setupXEnvironment() {\n"
+    "        String rootPath = rootFS.getRootDir().getPath();",
+    "    private void setupXEnvironment() {\n"
+    "        if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\"Runtime\", \"Preparando variables de Wine y Box64\", 76);\n"
+    "        String rootPath = rootFS.getRootDir().getPath();"
+)
+
+xtext = xtext.replace(
+    "        if (graphicsDriver[0].equals(GraphicsDrivers.VORTEK)) {\n"
+    "            VortekRendererComponent.Options options",
+    "        if (graphicsDriver[0].equals(GraphicsDrivers.VORTEK)) {\n"
+    "            if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\"Gráficos\", \"Iniciando Vortek para la GPU\", 84);\n"
+    "            VortekRendererComponent.Options options"
+)
+
+xtext = xtext.replace(
+    "        guestProgramLauncherComponent.setEnvVars(envVars);",
+    "        if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\"Box64 + Wine\", \"Preparando el ejecutable de Steam\", 88);\n"
+    "        guestProgramLauncherComponent.setEnvVars(envVars);"
+)
+
+xtext = xtext.replace(
+    "        environment.startEnvironmentComponents();\n\n"
+    "        winHandler.start();",
+    "        if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\"Box64 + Wine\", \"Iniciando servicios y proceso Windows\", 92);\n"
+    "        environment.startEnvironmentComponents();\n\n"
+    "        winHandler.start();\n"
+    "        if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\"Steam\", \"Esperando la primera ventana real\", 95);"
+)
+
+xtext = xtext.replace(
+    "        if (environment != null) {\n"
+    "            xServerView.onResume();\n"
+    "            environment.onResume();\n"
+    "        }",
+    "        if (environment != null) {\n"
+    "            xServerView.onResume();\n"
+    "            if (!droidDeckConsoleMode) environment.onResume();\n"
+    "        }"
+)
+
+xtext = xtext.replace(
+    "        if (environment != null && !isInPictureInPictureMode()) {\n"
+    "            environment.onPause();\n"
+    "            xServerView.onPause();\n"
+    "        }",
+    "        if (environment != null && !isInPictureInPictureMode()) {\n"
+    "            if (!droidDeckConsoleMode) environment.onPause();\n"
+    "            xServerView.onPause();\n"
+    "        }"
+)
+
+xtext = xtext.replace(
+    "    protected void onDestroy() {\n"
+    "        winHandler.stop();",
+    "    protected void onDestroy() {\n"
+    "        if (droidDeckRuntimeOverlay != null) {\n"
+    "            droidDeckRuntimeOverlay.close();\n"
+    "            droidDeckRuntimeOverlay = null;\n"
+    "        }\n"
+    "        winHandler.stop();"
+)
+
+xtext = xtext.replace(
+    "                    ConsoleLogStore.append(\"RUNTIME\", \"Proceso finalizado con código \" + status);\n"
+    "                    Intent result = new Intent();",
+    "                    ConsoleLogStore.append(\"RUNTIME\", \"Proceso finalizado con código \" + status);\n"
+    "                    if (droidDeckRuntimeOverlay != null) {\n"
+    "                        droidDeckRuntimeOverlay.close();\n"
+    "                        droidDeckRuntimeOverlay = null;\n"
+    "                    }\n"
+    "                    Intent result = new Intent();"
+)
+
+# Guard against silent patch drift.
+for token in [
+    'droidDeckRuntimeOverlay.stage("Wine"',
+    'droidDeckRuntimeOverlay.stage("Gráficos"',
+    'droidDeckRuntimeOverlay.stage("Audio"',
+    'droidDeckRuntimeOverlay.stage("Box64 + Wine"',
+    'droidDeckRuntimeOverlay.ready("Ventana de Steam lista")',
+    'if (!droidDeckConsoleMode) environment.onPause();',
+    'if (!droidDeckConsoleMode) environment.onResume();',
+]:
+    if token not in xtext:
+        raise SystemExit("telemetría DroidDeck no aplicada: falta " + token)
+
 xserver.write_text(xtext, encoding="utf-8")
 
 # Rebrand foreground runtime service and keep DroidDeck sessions alive when backgrounded.
