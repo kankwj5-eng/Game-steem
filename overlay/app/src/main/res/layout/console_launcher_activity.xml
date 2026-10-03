@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/console_background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingStart="30dp"
+        android:paddingTop="24dp"
+        android:paddingEnd="30dp"
+        android:paddingBottom="22dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:letterSpacing="0.18"
+                    android:text="DROIDDECK"
+                    android:textColor="@color/console_text"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/console_subtitle"
+                    android:textColor="@color/console_muted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/console_status_chip"
+                android:text="MALI · STEAM"
+                android:textColor="@color/console_text"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="22dp"
+            android:layout_weight="1"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1.35"
+                android:background="@drawable/console_card"
+                android:gravity="bottom"
+                android:orientation="vertical"
+                android:padding="30dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="PC GAMING EN ANDROID"
+                    android:textColor="@color/console_accent"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Steam, sin el escritorio en medio."
+                    android:textColor="@color/console_text"
+                    android:textSize="37sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/TVSteamState"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="Preparando el sistema…"
+                    android:textColor="@color/console_muted"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/TVDeviceInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Detectando hardware…"
+                    android:textColor="@color/console_muted"
+                    android:textSize="12sp" />
+
+                <Button
+                    android:id="@+id/BTStartSteam"
+                    android:layout_width="280dp"
+                    android:layout_height="58dp"
+                    android:layout_marginTop="24dp"
+                    android:background="@drawable/console_button"
+                    android:text="PREPARANDO…"
+                    android:textColor="@color/console_text"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <Space android:layout_width="18dp" android:layout_height="1dp" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/console_card"
+                android:orientation="vertical"
+                android:padding="22dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="PREPARACIÓN AUTOMÁTICA"
+                    android:textColor="@color/console_text"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView android:id="@+id/StepPermissionsStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:textColor="@color/console_muted" android:textSize="12sp" />
+                <ProgressBar android:id="@+id/StepPermissionsProgress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="3dp" android:max="100" />
+                <TextView android:id="@+id/StepSystemStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:textColor="@color/console_muted" android:textSize="12sp" />
+                <ProgressBar android:id="@+id/StepSystemProgress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="3dp" android:max="100" />
+                <TextView android:id="@+id/StepGpuStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:textColor="@color/console_muted" android:textSize="12sp" />
+                <ProgressBar android:id="@+id/StepGpuProgress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="3dp" android:max="100" />
+                <TextView android:id="@+id/StepContainerStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:textColor="@color/console_muted" android:textSize="12sp" />
+                <ProgressBar android:id="@+id/StepContainerProgress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="3dp" android:max="100" />
+                <TextView android:id="@+id/StepSteamStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:textColor="@color/console_muted" android:textSize="12sp" />
+                <ProgressBar android:id="@+id/StepSteamProgress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="3dp" android:max="100" />
+                <TextView android:id="@+id/StepLaunchStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:textColor="@color/console_muted" android:textSize="12sp" />
+                <ProgressBar android:id="@+id/StepLaunchProgress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="3dp" android:max="100" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginTop="14dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <Button android:id="@+id/BTControls" android:layout_width="0dp" android:layout_height="50dp" android:layout_weight="1" android:background="@drawable/console_button_secondary" android:text="@string/console_controls" android:textColor="@color/console_text" />
+            <Space android:layout_width="12dp" android:layout_height="1dp" />
+            <Button android:id="@+id/BTDiagnostics" android:layout_width="0dp" android:layout_height="50dp" android:layout_weight="1" android:background="@drawable/console_button_secondary" android:text="@string/console_diagnostics" android:textColor="@color/console_text" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/LogPanel"
+        android:layout_width="match_parent"
+        android:layout_height="280dp"
+        android:layout_gravity="bottom"
+        android:background="#F40A0D16"
+        android:elevation="20dp"
+        android:orientation="vertical"
+        android:padding="20dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="CONSOLA DE DIAGNÓSTICO"
+                android:textColor="@color/console_text"
+                android:textStyle="bold" />
+            <Button
+                android:id="@+id/BTCloseDiagnostics"
+                android:layout_width="52dp"
+                android:layout_height="38dp"
+                android:background="@drawable/console_button_secondary"
+                android:text="×"
+                android:textColor="@color/console_text"
+                android:textSize="20sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/TVLogPath"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="middle"
+            android:maxLines="1"
+            android:textColor="@color/console_muted"
+            android:textSize="10sp" />
+
+        <ScrollView
+            android:id="@+id/SVConsoleLog"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="8dp"
+            android:layout_weight="1">
+            <TextView
+                android:id="@+id/TVConsoleLog"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:textColor="@color/console_muted"
+                android:textIsSelectable="true"
+                android:textSize="11sp" />
+        </ScrollView>
+
+        <Button
+            android:id="@+id/BTRetry"
+            android:layout_width="180dp"
+            android:layout_height="42dp"
+            android:layout_gravity="end"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/console_button_secondary"
+            android:text="@string/console_retry"
+            android:textColor="@color/console_text" />
+    </LinearLayout>
+</FrameLayout>
