@@ -468,19 +468,31 @@ public final class ConsoleBootstrapController {
 
         if ("steam_install".equals(purpose)) {
             installerStarted = false;
-            if (status != 0) {
-                ConsoleLogStore.warn("Instalador oficial terminó con código " + status + "; comprobando antes del fallback.");
+            File steam = findSteamExecutableDeep(steamContainer);
+            if (steam != null) {
+                markSteamReady(steam);
+                return;
             }
-            waitForSteamAfterInstall(0);
+
+            ConsoleLogStore.warn("Método 1/2 terminó con código " + status + " y no produjo steam.exe.");
+            logSteamDirectoryState();
+            if (!steamFallbackStarted) startWinlatorSteamFallback();
+            else fail("steam", "El instalador oficial terminó sin producir steam.exe");
             return;
         }
 
         if ("steam_fallback".equals(purpose)) {
             installerStarted = false;
-            if (status != 0) {
-                ConsoleLogStore.warn("Fallback Winlator terminó con código " + status + "; buscando steam.exe de todos modos.");
+            File steam = findSteamExecutableDeep(steamContainer);
+            if (steam != null) {
+                markSteamReady(steam);
+                return;
             }
-            waitForSteamAfterFallback(0);
+
+            ConsoleLogStore.error("Método 2/2 terminó con código " + status + " y tampoco produjo steam.exe.");
+            logSteamDirectoryState();
+            pendingAutoLaunch = false;
+            fail("steam", "Los dos métodos de instalación terminaron sin producir steam.exe");
             return;
         }
 
