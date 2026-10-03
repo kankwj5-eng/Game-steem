@@ -86,7 +86,7 @@ manifest.write_text(text, encoding="utf-8")
 
 btext = build_gradle.read_text(encoding="utf-8")
 btext = btext.replace("applicationId 'com.winlator'", "applicationId 'com.droiddeck.console'")
-btext = btext.replace('versionName "11.2"', 'versionName "1.0.0-m10"')
+btext = btext.replace('versionName "11.2"', 'versionName "1.0.0-m11"')
 btext = btext.replace("org.tukaani:xz:1.7", "org.tukaani:xz:1.12")
 btext = btext.replace("org.apache.commons:commons-compress:1.20", "org.apache.commons:commons-compress:1.28.0")
 build_gradle.write_text(btext, encoding="utf-8")
@@ -562,5 +562,5 @@ notification_utils.write_text(nutext, encoding="utf-8")
 
 apply_native_security_fixes(src)
 
-print("Overlay DroidDeck M10 aplicado.")
+print("Overlay DroidDeck M11 aplicado.")
 print("Base esperada:", EXPECTED_SHA)

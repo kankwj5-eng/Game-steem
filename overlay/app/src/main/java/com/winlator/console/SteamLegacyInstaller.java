@@ -134,7 +134,24 @@ public final class SteamLegacyInstaller {
             String sha256 = sha256(archive);
             ConsoleLogStore.info("SHA-256 Steam Legacy: " + sha256);
             if (!EXPECTED_SHA256.isEmpty() && !EXPECTED_SHA256.equalsIgnoreCase(sha256)) {
-                throw new SecurityException("SHA-256 inesperado para steam-legacy.7z");
+                ConsoleLogStore.warn("CACHE CORRUPTA · SHA-256 no coincide; descartando paquete y reintentando desde cero");
+                if (archive.exists() && !archive.delete()) {
+                    throw new IllegalStateException("No se pudo eliminar la caché corrupta de Steam Legacy");
+                }
+                if (partial.exists() && !partial.delete()) {
+                    throw new IllegalStateException("No se pudo eliminar la descarga parcial corrupta");
+                }
+
+                publish(Phase.DOWNLOADING, "Caché corrupta descartada · descargando copia limpia", 1, 0, 0, "steam-legacy.7z");
+                downloadWithRetry(partial, archive);
+
+                publish(Phase.VERIFYING, "Revalidando copia limpia", 50, archive.length(), archive.length(), "steam-legacy.7z");
+                sha256 = sha256(archive);
+                ConsoleLogStore.info("SHA-256 Steam Legacy (copia limpia): " + sha256);
+                if (!EXPECTED_SHA256.equalsIgnoreCase(sha256)) {
+                    throw new SecurityException("SHA-256 inesperado incluso tras una descarga limpia");
+                }
+                ConsoleLogStore.ok("INTEGRIDAD · la copia limpia coincide con el SHA-256 fijado");
             }
 
             ArchiveIndex index = indexArchive(archive);
@@ -143,6 +160,16 @@ public final class SteamLegacyInstaller {
             }
             ConsoleLogStore.ok("PAQUETE · " + index.entries + " entradas · " + formatBytes(index.uncompressedBytes)
                     + " sin comprimir · steam.exe confirmado");
+
+            long usableBytes = driveC.getUsableSpace();
+            long safetyMargin = 128L * 1024L * 1024L;
+            long requiredBytes = index.uncompressedBytes + safetyMargin;
+            ConsoleLogStore.info("ALMACENAMIENTO · libre " + formatBytes(usableBytes)
+                    + " · requerido aprox. " + formatBytes(requiredBytes));
+            if (usableBytes > 0L && usableBytes < requiredBytes) {
+                throw new IllegalStateException("Espacio insuficiente: libres " + formatBytes(usableBytes)
+                        + ", necesarios aprox. " + formatBytes(requiredBytes));
+            }
 
             File targetRoot = new File(driveC, "Program Files (x86)");
             if (!targetRoot.isDirectory() && !targetRoot.mkdirs()) {
@@ -179,7 +206,7 @@ public final class SteamLegacyInstaller {
         catch (Throwable error) {
             String message = error.getMessage();
             if (message == null || message.trim().isEmpty()) message = error.getClass().getSimpleName();
-            ConsoleLogStore.error("STEAM INSTALL · " + message);
+            ConsoleLogStore.error("STEAM INSTALL · " + error.getClass().getSimpleName() + " · " + message);
             publish(Phase.ERROR, message, 0, 0, 0, "");
         }
         finally {
@@ -242,9 +269,9 @@ public final class SteamLegacyInstaller {
         long sampleTime = System.currentTimeMillis();
         int lastLog = -10;
 
-        try (InputStream raw = new BufferedInputStream(connection.getInputStream(), 256 * 1024);
+        try (InputStream raw = new BufferedInputStream(connection.getInputStream(), 1024 * 1024);
              FileOutputStream out = new FileOutputStream(partial, resumed)) {
-            byte[] buffer = new byte[256 * 1024];
+            byte[] buffer = new byte[1024 * 1024];
             long total = existing;
             int read;
             while ((read = raw.read(buffer)) != -1) {
@@ -334,7 +361,7 @@ public final class SteamLegacyInstaller {
 
         try (SevenZFile sevenZ = new SevenZFile(archive)) {
             SevenZArchiveEntry entry;
-            byte[] buffer = new byte[256 * 1024];
+            byte[] buffer = new byte[1024 * 1024];
 
             while ((entry = sevenZ.getNextEntry()) != null) {
                 String name = normalizeEntryName(entry.getName());
@@ -418,8 +445,8 @@ public final class SteamLegacyInstaller {
 
     private static String sha256(File file) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        try (InputStream in = new BufferedInputStream(new FileInputStream(file), 256 * 1024)) {
-            byte[] buffer = new byte[256 * 1024];
+        try (InputStream in = new BufferedInputStream(new FileInputStream(file), 1024 * 1024)) {
+            byte[] buffer = new byte[1024 * 1024];
             int read;
             while ((read = in.read(buffer)) != -1) digest.update(buffer, 0, read);
         }
