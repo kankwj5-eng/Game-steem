@@ -244,9 +244,8 @@ public final class ConsoleBootstrapController {
         }
         File steam = findSteamExecutable(steamContainer);
         if (steam != null) {
-            update("launch", "Inicio", "Abriendo Steam", BootstrapStep.State.RUNNING, 70);
+            update("launch", "Inicio", "Entregando Steam al motor", BootstrapStep.State.RUNNING, 10);
             launchWindowsExecutable(steam, null, "steam_client");
-            main.postDelayed(() -> update("launch", "Inicio", "Steam ejecutándose", BootstrapStep.State.DONE, 100), 900);
         }
         else downloadAndRunInstaller();
     }
