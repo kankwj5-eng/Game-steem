@@ -63,6 +63,7 @@ public final class ConsoleBootstrapController {
     private boolean downloadRunning;
     private boolean installerStarted;
     private boolean pendingAutoLaunch;
+    private boolean runtimeActive;
 
     public ConsoleBootstrapController(AppCompatActivity activity, Listener listener) {
         this.activity = activity;
@@ -130,7 +131,7 @@ public final class ConsoleBootstrapController {
     }
 
     public void refreshAfterResume() {
-        if (!prepared) return;
+        if (!prepared || runtimeActive) return;
         RootFS root = RootFS.find(activity);
         if (!root.isValid() || root.getVersion() < RootFSInstaller.LATEST_VERSION) return;
         if (steamContainer == null) return;
@@ -254,6 +255,7 @@ public final class ConsoleBootstrapController {
         downloadRunning = false;
         installerStarted = false;
         pendingAutoLaunch = false;
+        runtimeActive = false;
         if (steamContainer == null) {
             prepared = false;
             preparing = false;
@@ -277,10 +279,18 @@ public final class ConsoleBootstrapController {
         update("steam", "Steam", "Descargando instalador oficial", BootstrapStep.State.RUNNING, 2);
         ConsoleLogStore.info("Descargando SteamSetup.exe desde el CDN oficial de Steam.");
         io.execute(() -> {
-            File dir = new File(activity.getFilesDir(), "droiddeck/downloads");
-            if (!dir.exists()) dir.mkdirs();
+            File dir = new File(steamContainer.getRootDir(), ".wine/drive_c/DroidDeck");
+            if (!dir.exists() && !dir.mkdirs()) {
+                main.post(() -> {
+                    downloadRunning = false;
+                    fail("steam", "No se pudo crear C:\\DroidDeck dentro del prefijo Wine");
+                });
+                return;
+            }
             File dst = new File(dir, "SteamSetup.exe");
             File part = new File(dir, "SteamSetup.exe.part");
+            ConsoleLogStore.info("Destino real Wine: C:\\DroidDeck\\SteamSetup.exe");
+            ConsoleLogStore.info("Destino Android: " + dst.getAbsolutePath());
 
             if (isValidInstaller(dst)) {
                 main.post(() -> runInstaller(dst));
@@ -375,11 +385,13 @@ public final class ConsoleBootstrapController {
         if (args != null && !args.trim().isEmpty()) intent.putExtra("exec_args", args.trim());
         intent.putExtra("droiddeck_console", true);
         intent.putExtra("droiddeck_purpose", purpose);
+        runtimeActive = true;
         activity.startActivityForResult(intent, REQUEST_RUNTIME);
-        ConsoleLogStore.info("Wine launch [" + purpose + "]: " + executable.getName() + (args == null ? "" : " " + args));
+        ConsoleLogStore.info("Wine launch [" + purpose + "]: " + executable.getAbsolutePath() + (args == null ? "" : " " + args));
     }
 
     public void handleRuntimeResult(int resultCode, Intent data) {
+        runtimeActive = false;
         if (resultCode != Activity.RESULT_OK || data == null) {
             ConsoleLogStore.warn("El runtime volvió sin código de salida utilizable.");
             refreshAfterResume();
@@ -396,18 +408,7 @@ public final class ConsoleBootstrapController {
                 fail("steam", "SteamSetup terminó con código " + status + ". Revisa la consola.");
                 return;
             }
-            File steam = findSteamExecutable(steamContainer);
-            if (steam == null) {
-                pendingAutoLaunch = false;
-                fail("steam", "El instalador terminó correctamente, pero steam.exe no apareció.");
-                return;
-            }
-            update("steam", "Steam", "Instalación completada", BootstrapStep.State.DONE, 100);
-            listener.onReady(true);
-            if (pendingAutoLaunch) {
-                pendingAutoLaunch = false;
-                main.postDelayed(this::startSteam, 350);
-            }
+            waitForSteamAfterInstall(0);
             return;
         }
 
@@ -422,6 +423,60 @@ public final class ConsoleBootstrapController {
         }
 
         refreshAfterResume();
+    }
+
+    private void waitForSteamAfterInstall(int attempt) {
+        File steam = findSteamExecutable(steamContainer);
+        if (steam != null) {
+            installerStarted = false;
+            update("steam", "Steam", "Instalación completada", BootstrapStep.State.DONE, 100);
+            ConsoleLogStore.ok("steam.exe encontrado: " + steam.getAbsolutePath());
+            listener.onReady(true);
+            if (pendingAutoLaunch) {
+                pendingAutoLaunch = false;
+                main.postDelayed(this::startSteam, 350);
+            }
+            return;
+        }
+
+        if (attempt >= 30) {
+            installerStarted = false;
+            pendingAutoLaunch = false;
+            logSteamDirectoryState();
+            fail("steam", "SteamSetup terminó, pero steam.exe no apareció después de 15 s");
+            return;
+        }
+
+        int seconds = attempt / 2;
+        int progress = Math.min(99, 96 + (attempt / 10));
+        update("steam", "Steam",
+                "Finalizando instalación… " + seconds + " s · buscando steam.exe",
+                BootstrapStep.State.RUNNING, progress);
+        if (attempt % 4 == 0) {
+            ConsoleLogStore.info("Verificando steam.exe… intento " + (attempt + 1) + "/31");
+        }
+        main.postDelayed(() -> waitForSteamAfterInstall(attempt + 1), 500);
+    }
+
+    private void logSteamDirectoryState() {
+        if (steamContainer == null) return;
+        File programFiles = new File(steamContainer.getRootDir(), ".wine/drive_c/Program Files (x86)");
+        File programFiles64 = new File(steamContainer.getRootDir(), ".wine/drive_c/Program Files");
+        ConsoleLogStore.warn("Inspección de C:\\Program Files (x86): " + listNames(programFiles));
+        ConsoleLogStore.warn("Inspección de C:\\Program Files: " + listNames(programFiles64));
+    }
+
+    private String listNames(File dir) {
+        if (dir == null || !dir.isDirectory()) return "[no existe]";
+        String[] names = dir.list();
+        if (names == null || names.length == 0) return "[vacío]";
+        java.util.Arrays.sort(names, String.CASE_INSENSITIVE_ORDER);
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < names.length && i < 40; i++) {
+            if (i > 0) out.append(", ");
+            out.append(names[i]);
+        }
+        return out.toString();
     }
 
     private File findSteamExecutable(Container container) {
