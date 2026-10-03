@@ -223,7 +223,12 @@ if 'intent.getStringExtra("exec_args")' not in xtext:
         "                if (execPath.endsWith(\".lnk\")) {"
     )
     new_exec = (
-        "            if (intent.hasExtra(\"exec_path\")) {\n"
+        "            if (intent.hasExtra(\"exec_dos_path\")) {\n"
+        "                execPath = intent.getStringExtra(\"exec_dos_path\");\n"
+        "                String explicitDosArgs = intent.getStringExtra(\"exec_args\");\n"
+        "                if (explicitDosArgs != null && !explicitDosArgs.trim().isEmpty()) execArgs = \" \"+explicitDosArgs.trim();\n"
+        "            }\n"
+        "            else if (intent.hasExtra(\"exec_path\")) {\n"
         "                execPath = WineUtils.unixToDOSPath(intent.getStringExtra(\"exec_path\"), container);\n"
         "                String explicitExecArgs = intent.getStringExtra(\"exec_args\");\n"
         "                if (explicitExecArgs != null && !explicitExecArgs.trim().isEmpty()) execArgs = \" \"+explicitExecArgs.trim();\n\n"
