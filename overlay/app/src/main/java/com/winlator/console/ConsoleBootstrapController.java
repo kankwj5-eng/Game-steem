@@ -19,7 +19,6 @@ import com.winlator.container.Container;
 import com.winlator.container.ContainerManager;
 import com.winlator.container.GraphicsDrivers;
 import com.winlator.core.GPUHelper;
-import com.winlator.core.FileUtils;
 import com.winlator.core.WineThemeManager;
 import com.winlator.core.WineUtils;
 import com.winlator.xenvironment.RootFS;
@@ -438,6 +437,24 @@ public final class ConsoleBootstrapController {
         ConsoleLogStore.info("Wine launch [" + purpose + "]: " + executable.getAbsolutePath() + (args == null ? "" : " " + args));
     }
 
+    private void launchWindowsDosExecutable(String dosPath, String args, String purpose) {
+        if (dosPath == null || dosPath.trim().isEmpty() || !dosPath.contains(":")) {
+            fail("steam", "Ruta DOS inválida: " + dosPath);
+            return;
+        }
+
+        Intent intent = new Intent(activity, XServerDisplayActivity.class);
+        intent.putExtra("container_id", steamContainer.id);
+        intent.putExtra("exec_dos_path", dosPath.trim());
+        if (args != null && !args.trim().isEmpty()) intent.putExtra("exec_args", args.trim());
+        intent.putExtra("droiddeck_console", true);
+        intent.putExtra("droiddeck_purpose", purpose);
+
+        runtimeActive = true;
+        activity.startActivityForResult(intent, REQUEST_RUNTIME);
+        ConsoleLogStore.info("Wine DOS launch [" + purpose + "]: " + dosPath + (args == null ? "" : " " + args));
+    }
+
     public void handleRuntimeResult(int resultCode, Intent data) {
         runtimeActive = false;
         if (resultCode != Activity.RESULT_OK || data == null) {
@@ -532,27 +549,11 @@ public final class ConsoleBootstrapController {
             return;
         }
 
-        File dir = new File(steamContainer.getRootDir(), ".wine/drive_c/DroidDeck");
-        if (!dir.isDirectory() && !dir.mkdirs()) {
-            installerStarted = false;
-            fail("steam", "No se pudo preparar C:\\DroidDeck para el fallback");
-            return;
-        }
-
-        File fallback = new File(dir, "WinAddons.exe");
-        if (!fallback.isFile() || fallback.length() != source.length()) {
-            if (!FileUtils.copy(source, fallback)) {
-                installerStarted = false;
-                fail("steam", "No se pudo copiar el instalador compatible de Winlator");
-                return;
-            }
-        }
-
         update("steam", "Steam", "Método 2/2 · instalador compatible de Winlator", BootstrapStep.State.RUNNING, 98);
         ConsoleLogStore.warn("SteamSetup oficial no produjo steam.exe; activando fallback compatible de Winlator.");
-        ConsoleLogStore.info("Fallback: WinAddons.exe -n \"Steam (Legacy)\" -d \"Steam\" -e \"steam.exe\"");
-        launchWindowsExecutable(
-                fallback,
+        ConsoleLogStore.info("Fallback directo: Z:\\opt\\apps\\winaddons.exe -n \"Steam (Legacy)\" -d \"Steam\" -e \"steam.exe\"");
+        launchWindowsDosExecutable(
+                "Z:\\opt\\apps\\winaddons.exe",
                 "-n \"Steam (Legacy)\" -d \"Steam\" -e \"steam.exe\"",
                 "steam_fallback"
         );
