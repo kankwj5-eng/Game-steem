@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/console_background"
+    android:orientation="horizontal"
+    android:elevation="100dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingStart="34dp"
+        android:paddingTop="28dp"
+        android:paddingEnd="30dp"
+        android:paddingBottom="28dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:letterSpacing="0.17"
+            android:text="DROIDDECK"
+            android:textColor="@color/console_text"
+            android:textSize="25sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:text="MOTOR OCULTO · PREPARACIÓN REAL"
+            android:textColor="@color/console_muted"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+        <Space android:layout_width="1dp" android:layout_height="0dp" android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/TVRuntimeStage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Motor"
+            android:textColor="@color/console_text"
+            android:textSize="38sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/TVRuntimeDetail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Preparando entorno Windows"
+            android:textColor="@color/console_muted"
+            android:textSize="15sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:gravity="bottom"
+            android:orientation="horizontal">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Progreso del motor"
+                android:textColor="@color/console_muted"
+                android:textSize="12sp" />
+            <TextView
+                android:id="@+id/TVRuntimePercent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0%"
+                android:textColor="@color/console_text"
+                android:textSize="32sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <ProgressBar
+            android:id="@+id/PBRuntime"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="8dp"
+            android:layout_marginTop="8dp"
+            android:max="100" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="Puedes salir de la app. DroidDeck seguirá trabajando en segundo plano."
+            android:textColor="@color/console_muted"
+            android:textSize="11sp" />
+
+        <Space android:layout_width="1dp" android:layout_height="0dp" android:layout_weight="1" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:background="#2AFFFFFF" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="#66040812"
+        android:orientation="vertical"
+        android:paddingStart="28dp"
+        android:paddingTop="28dp"
+        android:paddingEnd="28dp"
+        android:paddingBottom="22dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="ACTIVIDAD DEL MOTOR"
+            android:textColor="@color/console_text"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView android:id="@+id/TVRuntimeWine" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="○  Wine y prefijo" android:textColor="@color/console_muted" android:textSize="12sp" />
+        <TextView android:id="@+id/TVRuntimeGraphics" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="9dp" android:text="○  Vortek / Gladio" android:textColor="@color/console_muted" android:textSize="12sp" />
+        <TextView android:id="@+id/TVRuntimeAudio" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="9dp" android:text="○  Audio" android:textColor="@color/console_muted" android:textSize="12sp" />
+        <TextView android:id="@+id/TVRuntimeBox64" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="9dp" android:text="○  Box64 + Wine" android:textColor="@color/console_muted" android:textSize="12sp" />
+        <TextView android:id="@+id/TVRuntimeWindow" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="9dp" android:text="○  Ventana de Steam" android:textColor="@color/console_muted" android:textSize="12sp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="10dp"
+            android:background="#24FFFFFF" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="CONSOLA REAL"
+            android:textColor="@color/console_text"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <ScrollView
+            android:id="@+id/SVRuntimeLog"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="8dp"
+            android:layout_weight="1"
+            android:background="#52000000"
+            android:padding="10dp">
+            <TextView
+                android:id="@+id/TVRuntimeLog"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="Esperando actividad real del motor…"
+                android:textColor="#CBD3E9"
+                android:textIsSelectable="true"
+                android:textSize="10sp" />
+        </ScrollView>
+    </LinearLayout>
+</LinearLayout>
