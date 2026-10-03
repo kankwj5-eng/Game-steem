@@ -20,6 +20,7 @@ import com.winlator.container.ContainerManager;
 import com.winlator.container.GraphicsDrivers;
 import com.winlator.core.GPUHelper;
 import com.winlator.core.WineThemeManager;
+import com.winlator.core.WineUtils;
 import com.winlator.xenvironment.RootFS;
 import com.winlator.xenvironment.RootFSInstaller;
 
@@ -327,7 +328,7 @@ public final class ConsoleBootstrapController {
         connection.setConnectTimeout(15_000);
         connection.setReadTimeout(60_000);
         connection.setInstanceFollowRedirects(true);
-        connection.setRequestProperty("User-Agent", "DroidDeck/0.2 Android");
+        connection.setRequestProperty("User-Agent", "DroidDeck/0.4 Android");
         if (existing > 0) connection.setRequestProperty("Range", "bytes=" + existing + "-");
         connection.connect();
 
@@ -341,25 +342,47 @@ public final class ConsoleBootstrapController {
 
         long bodyLength = connection.getContentLengthLong();
         long expected = bodyLength > 0 ? existing + bodyLength : -1L;
+        ConsoleLogStore.info("Steam HTTP " + code
+                + (resumed ? " · reanudando desde " + formatBytes(existing) : " · descarga nueva")
+                + (expected > 0 ? " · total " + formatBytes(expected) : ""));
+
         try (InputStream raw = new BufferedInputStream(connection.getInputStream());
              FileOutputStream out = new FileOutputStream(part, resumed)) {
             byte[] buffer = new byte[128 * 1024];
             long total = existing;
+            long sampleBytes = total;
+            long sampleTime = System.currentTimeMillis();
+            long lastUi = 0L;
+            int lastLoggedPct = -5;
             int n;
-            long lastUi = 0;
+
             while ((n = raw.read(buffer)) != -1) {
                 out.write(buffer, 0, n);
                 total += n;
                 long now = System.currentTimeMillis();
-                if (now - lastUi >= 180) {
+
+                if (now - lastUi >= 200L) {
+                    long elapsed = Math.max(1L, now - sampleTime);
+                    long delta = Math.max(0L, total - sampleBytes);
+                    double speed = (delta * 1000.0) / elapsed;
+                    sampleBytes = total;
+                    sampleTime = now;
                     lastUi = now;
-                    final int pct = expected > 0
-                            ? Math.min(96, 4 + (int)(92L * total / expected))
-                            : Math.min(92, 4 + (int)Math.min(88L, total / 131_072L));
+
+                    final int pct = expected > 0 ? Math.min(100, (int)((100L * total) / expected)) : 0;
                     final long copied = total;
-                    main.post(() -> update("steam", "Steam",
-                            "Descargando · " + formatBytes(copied) + " · intento " + attempt + "/3",
-                            BootstrapStep.State.RUNNING, pct));
+                    final long target = expected;
+                    final double bytesPerSecond = speed;
+                    final String detail = target > 0
+                            ? pct + "% · " + formatBytes(copied) + " de " + formatBytes(target) + " · " + formatSpeed(bytesPerSecond)
+                            : formatBytes(copied) + " · " + formatSpeed(bytesPerSecond);
+
+                    main.post(() -> update("steam", "Steam", detail, BootstrapStep.State.RUNNING, pct));
+
+                    if (pct >= lastLoggedPct + 5) {
+                        lastLoggedPct = pct;
+                        ConsoleLogStore.info("Steam download · " + detail);
+                    }
                 }
             }
             out.getFD().sync();
@@ -367,18 +390,42 @@ public final class ConsoleBootstrapController {
         finally {
             connection.disconnect();
         }
+
+        long finalSize = part.length();
+        if (expected > 0 && finalSize != expected) {
+            throw new IllegalStateException("Tamaño incompleto: " + formatBytes(finalSize) + " de " + formatBytes(expected));
+        }
+        ConsoleLogStore.ok("SteamSetup.exe descargado completo · " + formatBytes(finalSize));
     }
 
     private void runInstaller(File installer) {
         downloadRunning = false;
+        if (!isValidInstaller(installer)) {
+            fail("steam", "SteamSetup.exe no pasó la validación antes de ejecutarse");
+            return;
+        }
+
+        String dosPath = WineUtils.unixToDOSPath(installer.getAbsolutePath(), steamContainer);
+        if (dosPath == null || dosPath.isEmpty() || !dosPath.toUpperCase(java.util.Locale.US).startsWith("C:")) {
+            fail("steam", "El instalador no quedó en una ruta válida de Wine: " + dosPath);
+            return;
+        }
+
         installerStarted = true;
         pendingAutoLaunch = true;
-        update("steam", "Steam", "Instalando automáticamente", BootstrapStep.State.RUNNING, 98);
-        ConsoleLogStore.info("Ejecutando SteamSetup.exe /S dentro de Wine.");
+        update("steam", "Steam", "Instalando automáticamente · C:\\DroidDeck\\SteamSetup.exe", BootstrapStep.State.RUNNING, 98);
+        ConsoleLogStore.ok("Instalador listo · " + formatBytes(installer.length()) + " · " + dosPath);
+        ConsoleLogStore.info("Ejecutando " + dosPath + " /S dentro de Wine.");
         launchWindowsExecutable(installer, "/S", "steam_install");
     }
 
     private void launchWindowsExecutable(File executable, String args, String purpose) {
+        String dosPath = WineUtils.unixToDOSPath(executable.getAbsolutePath(), steamContainer);
+        if (dosPath == null || dosPath.isEmpty() || !dosPath.contains(":")) {
+            fail("steam", "Wine no pudo mapear el ejecutable: " + executable.getAbsolutePath());
+            return;
+        }
+        ConsoleLogStore.info("Ruta Wine resuelta: " + dosPath);
         Intent intent = new Intent(activity, XServerDisplayActivity.class);
         intent.putExtra("container_id", steamContainer.id);
         intent.putExtra("exec_path", executable.getAbsolutePath());
