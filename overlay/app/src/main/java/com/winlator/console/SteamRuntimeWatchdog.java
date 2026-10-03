@@ -24,7 +24,7 @@ import java.util.concurrent.Executors;
 
 public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
     private static final long TICK_MS = 1000L;
-    private static final long FILE_SCAN_MS = 1500L;
+    private static final long FILE_SCAN_MS = 5000L;
     private static final long STALL_MS = 60_000L;
 
     private final XServerDisplayActivity activity;
@@ -52,6 +52,7 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
     private long lastFileScanAt;
     private long previousFileBytes = -1L;
     private long previousNewestMtime;
+    private long previousFileSampleAt;
     private double fileWriteRate;
 
     private String linuxProcessSummary = "[sin datos]";
@@ -109,7 +110,7 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
         winHandler.setOnGetProcessInfoListener(this);
         ProcessHelper.addDebugCallback(runtimeDebugCallback);
 
-        ConsoleLogStore.info("WATCHDOG iniciado · propósito=" + purpose);
+        ConsoleLogStore.info("WATCHDOG iniciado · propósito=" + purpose + " · archivos cada " + FILE_SCAN_MS + " ms");
         handler.post(ticker);
     }
 
@@ -213,9 +214,12 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
                 FileSnapshot snapshot = scanSteamFiles();
                 long finishedAt = android.os.SystemClock.elapsedRealtime();
 
-                if (previousFileBytes >= 0 && finishedAt > snapshot.sampleStartedAt) {
+                if (previousFileBytes >= 0 && previousFileSampleAt > 0L && finishedAt > previousFileSampleAt) {
                     long delta = Math.max(0L, snapshot.totalBytes - previousFileBytes);
-                    fileWriteRate = delta * 1000.0 / Math.max(1L, finishedAt - snapshot.sampleStartedAt);
+                    fileWriteRate = delta * 1000.0 / Math.max(1L, finishedAt - previousFileSampleAt);
+                }
+                else {
+                    fileWriteRate = 0.0;
                 }
 
                 boolean changed = previousFileBytes < 0
@@ -232,6 +236,7 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
 
                 previousFileBytes = snapshot.totalBytes;
                 previousNewestMtime = snapshot.newestMtime;
+                previousFileSampleAt = finishedAt;
                 fileSnapshot = snapshot;
             }
             catch (Exception e) {
@@ -258,7 +263,7 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
 
         FileSnapshot snapshot = new FileSnapshot();
         snapshot.sampleStartedAt = sampleStartedAt;
-        int[] budget = {12000};
+        int[] budget = {8000};
 
         for (File root : roots) {
             scanDirectory(root, driveC, snapshot, 0, budget);
