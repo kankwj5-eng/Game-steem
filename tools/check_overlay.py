@@ -25,11 +25,13 @@ for p in (root / "tools").glob("*.py"):
 
 controller = (root / "overlay/app/src/main/java/com/winlator/console/ConsoleBootstrapController.java").read_text()
 activity = (root / "overlay/app/src/main/java/com/winlator/ConsoleLauncherActivity.java").read_text()
-for token in ["SteamSetup.exe", '"/S"', "Range", "onDeviceInfo", "retry()"]:
+
+for token in ["SteamSetup.exe", '"/S"', "Range", "formatSpeed", "handleRuntimeResult", "retry()"]:
     if token not in controller:
         raise SystemExit(f"controlador incompleto: falta {token}")
-for token in ["requestRequiredPermissions", "showDiagnostics", "StepPermissionsStatus"]:
+
+for token in ["requestRequiredPermissions", "onActivityResult", "TVCurrentPercent", "StepPermissionsStatus"]:
     if token not in activity:
         raise SystemExit(f"launcher incompleto: falta {token}")
 
-print("Overlay M2 válido: XML, scripts, permisos, descarga reanudable y diagnóstico presentes.")
+print("Overlay M3 válido: UI 50/50, progreso real, runtime retornable y diagnóstico presentes.")
