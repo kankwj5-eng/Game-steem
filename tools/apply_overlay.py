@@ -62,7 +62,7 @@ manifest.write_text(text, encoding="utf-8")
 
 btext = build_gradle.read_text(encoding="utf-8")
 btext = btext.replace("applicationId 'com.winlator'", "applicationId 'com.droiddeck.console'")
-btext = btext.replace('versionName "11.2"', 'versionName "0.2.0-m2"')
+btext = btext.replace('versionName "11.2"', 'versionName "0.3.0-m3"')
 build_gradle.write_text(btext, encoding="utf-8")
 
 for strings in (src / "app/src/main/res").glob("values*/strings.xml"):
@@ -170,6 +170,25 @@ new_four = (
     "        });"
 )
 xtext = xtext.replace(old_four, new_four)
+
+if 'droiddeck_runtime_exit_status' not in xtext:
+    old_termination = '        guestProgramLauncherComponent.setTerminationCallback((status) -> exit());'
+    new_termination = (
+        '        guestProgramLauncherComponent.setTerminationCallback((status) -> {\n'
+        '            if (droidDeckConsoleMode) {\n'
+        '                ConsoleLogStore.append("RUNTIME", "Proceso finalizado con código " + status);\n'
+        '                Intent result = new Intent();\n'
+        '                result.putExtra("droiddeck_runtime_exit_status", status);\n'
+        '                result.putExtra("droiddeck_runtime_purpose", getIntent().getStringExtra("droiddeck_purpose"));\n'
+        '                setResult(Activity.RESULT_OK, result);\n'
+        '                finish();\n'
+        '            }\n'
+        '            else exit();\n'
+        '        });'
+    )
+    if old_termination not in xtext:
+        raise SystemExit("DroidDeck runtime must return: termination callback not found")
+    xtext = xtext.replace(old_termination, new_termination)
 
 if 'intent.getStringExtra("exec_args")' not in xtext:
     old_exec = (
