@@ -1,5 +1,6 @@
 package com.winlator.console;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
@@ -37,6 +38,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class ConsoleBootstrapController {
+    public static final int REQUEST_RUNTIME = 7202;
+
     public interface Listener {
         void onStep(BootstrapStep step);
         void onReady(boolean steamInstalled);
@@ -241,7 +244,7 @@ public final class ConsoleBootstrapController {
         File steam = findSteamExecutable(steamContainer);
         if (steam != null) {
             update("launch", "Inicio", "Abriendo Steam", BootstrapStep.State.RUNNING, 70);
-            launchWindowsExecutable(steam, null);
+            launchWindowsExecutable(steam, null, "steam_client");
             main.postDelayed(() -> update("launch", "Inicio", "Steam ejecutándose", BootstrapStep.State.DONE, 100), 900);
         }
         else downloadAndRunInstaller();
@@ -362,17 +365,63 @@ public final class ConsoleBootstrapController {
         pendingAutoLaunch = true;
         update("steam", "Steam", "Instalando automáticamente", BootstrapStep.State.RUNNING, 98);
         ConsoleLogStore.info("Ejecutando SteamSetup.exe /S dentro de Wine.");
-        launchWindowsExecutable(installer, "/S");
+        launchWindowsExecutable(installer, "/S", "steam_install");
     }
 
-    private void launchWindowsExecutable(File executable, String args) {
+    private void launchWindowsExecutable(File executable, String args, String purpose) {
         Intent intent = new Intent(activity, XServerDisplayActivity.class);
         intent.putExtra("container_id", steamContainer.id);
         intent.putExtra("exec_path", executable.getAbsolutePath());
         if (args != null && !args.trim().isEmpty()) intent.putExtra("exec_args", args.trim());
         intent.putExtra("droiddeck_console", true);
-        activity.startActivity(intent);
-        ConsoleLogStore.info("Wine launch: " + executable.getName() + (args == null ? "" : " " + args));
+        intent.putExtra("droiddeck_purpose", purpose);
+        activity.startActivityForResult(intent, REQUEST_RUNTIME);
+        ConsoleLogStore.info("Wine launch [" + purpose + "]: " + executable.getName() + (args == null ? "" : " " + args));
+    }
+
+    public void handleRuntimeResult(int resultCode, Intent data) {
+        if (resultCode != Activity.RESULT_OK || data == null) {
+            ConsoleLogStore.warn("El runtime volvió sin código de salida utilizable.");
+            refreshAfterResume();
+            return;
+        }
+        int status = data.getIntExtra("droiddeck_runtime_exit_status", Integer.MIN_VALUE);
+        String purpose = data.getStringExtra("droiddeck_runtime_purpose");
+        ConsoleLogStore.info("Runtime finalizado · propósito=" + purpose + " · código=" + status);
+
+        if ("steam_install".equals(purpose)) {
+            installerStarted = false;
+            if (status != 0) {
+                pendingAutoLaunch = false;
+                fail("steam", "SteamSetup terminó con código " + status + ". Revisa la consola.");
+                return;
+            }
+            File steam = findSteamExecutable(steamContainer);
+            if (steam == null) {
+                pendingAutoLaunch = false;
+                fail("steam", "El instalador terminó correctamente, pero steam.exe no apareció.");
+                return;
+            }
+            update("steam", "Steam", "Instalación completada", BootstrapStep.State.DONE, 100);
+            listener.onReady(true);
+            if (pendingAutoLaunch) {
+                pendingAutoLaunch = false;
+                main.postDelayed(this::startSteam, 350);
+            }
+            return;
+        }
+
+        if ("steam_client".equals(purpose)) {
+            if (status == 0) {
+                update("launch", "Inicio", "Steam cerrado por el usuario", BootstrapStep.State.DONE, 100);
+            }
+            else {
+                fail("launch", "Steam terminó con código " + status + ". Revisa la consola.");
+            }
+            return;
+        }
+
+        refreshAfterResume();
     }
 
     private File findSteamExecutable(Container container) {
@@ -426,6 +475,16 @@ public final class ConsoleBootstrapController {
         if (bytes >= 1024L * 1024L) return String.format(java.util.Locale.US, "%.1f MB", bytes / 1048576.0);
         if (bytes >= 1024L) return String.format(java.util.Locale.US, "%.0f KB", bytes / 1024.0);
         return bytes + " B";
+    }
+
+    private String formatSpeed(double bytesPerSecond) {
+        if (bytesPerSecond >= 1024.0 * 1024.0) {
+            return String.format(java.util.Locale.US, "%.1f MB/s", bytesPerSecond / 1048576.0);
+        }
+        if (bytesPerSecond >= 1024.0) {
+            return String.format(java.util.Locale.US, "%.0f KB/s", bytesPerSecond / 1024.0);
+        }
+        return String.format(java.util.Locale.US, "%.0f B/s", bytesPerSecond);
     }
 
     private void fail(String id, String message) {
