@@ -56,7 +56,8 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
 
     private String linuxProcessSummary = "[sin datos]";
     private int linuxProcessCount;
-    private String lastProcessSignature = "";
+    private String lastLinuxProcessSignature = "";
+    private String lastWindowsProcessSignature = "";
 
     private final Callback<String> runtimeDebugCallback = line -> {
         if (!running || line == null) return;
@@ -183,8 +184,8 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
         linuxProcessSummary = names.length() > 0 ? names.toString() : "[sin procesos guest visibles]";
 
         String signature = linuxProcessCount + ":" + linuxProcessSummary;
-        if (!signature.equals(lastProcessSignature)) {
-            lastProcessSignature = signature;
+        if (!signature.equals(lastLinuxProcessSignature)) {
+            lastLinuxProcessSignature = signature;
             lastActivityAt = android.os.SystemClock.elapsedRealtime();
         }
     }
@@ -196,8 +197,8 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
         }
 
         String value = signature.toString();
-        if (!value.equals(lastProcessSignature)) {
-            lastProcessSignature = value;
+        if (!value.equals(lastWindowsProcessSignature)) {
+            lastWindowsProcessSignature = value;
             lastActivityAt = android.os.SystemClock.elapsedRealtime();
         }
     }
