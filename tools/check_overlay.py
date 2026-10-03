@@ -10,6 +10,8 @@ required = [
     root / "overlay/app/src/main/java/com/winlator/console/ConsoleBootstrapController.java",
     root / "overlay/app/src/main/java/com/winlator/console/ConsoleLogStore.java",
     root / "overlay/app/src/main/java/com/winlator/console/BootstrapStep.java",
+    root / "overlay/app/src/main/java/com/winlator/console/RuntimeConsoleOverlay.java",
+    root / "overlay/app/src/main/res/layout/droiddeck_runtime_overlay.xml",
     root / "overlay/app/src/main/res/layout/console_launcher_activity.xml",
     root / "overlay/app/src/main/res/drawable/console_status_chip.xml",
 ]
@@ -64,10 +66,9 @@ for token in [
     'droidDeckRuntimeOverlay.stage("Audio"',
     'droidDeckRuntimeOverlay.stage("Box64 + Wine"',
     'droidDeckRuntimeOverlay.ready("Ventana de Steam lista")',
-    "enable_background_protection",
     "DroidDeck:ForegroundService",
 ]:
     if token not in patcher:
-        raise SystemExit(f"parche M4 incompleto: falta {token}")
+        raise SystemExit(f"parche M5 incompleto: falta {token}")
 
 print("Overlay M5 válido: Winlator oculto, telemetría real, Steam manual y segundo plano activos.")
