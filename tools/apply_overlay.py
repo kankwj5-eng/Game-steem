@@ -235,75 +235,107 @@ if 'intent.getStringExtra("exec_args")' not in xtext:
 # Keep the Wine environment alive after SteamSetup's parent process exits.
 if 'waitForDroidDeckSteamInstaller' not in xtext:
     installer_anchor = "    private boolean isGenerateWineprefix() {"
-    installer_methods = (
-        "    private void waitForDroidDeckSteamInstaller(int parentStatus, long waitStartedAt) {\n"
-        "        if (isFinishing() || isDestroyed()) return;\n"
-        "        File steamExe = findDroidDeckSteamExecutable();\n"
-        "        long elapsed = android.os.SystemClock.elapsedRealtime() - waitStartedAt;\n"
-        "        int seconds = (int)(elapsed / 1000L);\n"
-        "        if (steamExe != null && steamExe.isFile()) {\n"
-        "            ConsoleLogStore.append(\\"OK\\", \\"Steam instalado: \\" + steamExe.getAbsolutePath());\n"
-        "            if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\\"Steam\\", \\"steam.exe encontrado · instalación completada\\", 100);\n"
-        "            getWindow().getDecorView().postDelayed(() -> finishDroidDeckRuntime(0), 350L);\n"
-        "            return;\n"
-        "        }\n"
-        "        if (elapsed >= 120000L) {\n"
-        "            ConsoleLogStore.append(\\"ERROR\\", \\"SteamSetup terminó pero steam.exe no apareció tras 120 s.\\");\n"
-        "            finishDroidDeckRuntime(parentStatus != 0 ? parentStatus : 66);\n"
-        "            return;\n"
-        "        }\n"
-        "        int progress = Math.min(99, 96 + (seconds / 40));\n"
-        "        if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\\"Steam\\", \\"Finalizando instalación · esperando procesos hijos · \\" + seconds + \\" s\\", progress);\n"
-        "        if (seconds == 0 || seconds % 5 == 0) ConsoleLogStore.append(\\"INFO\\", \\"SteamSetup padre terminó; manteniendo Wine activo · \\" + seconds + \\" s\\");\n"
-        "        getWindow().getDecorView().postDelayed(() -> waitForDroidDeckSteamInstaller(parentStatus, waitStartedAt), 1000L);\n"
-        "    }\n\n"
-        "    private File findDroidDeckSteamExecutable() {\n"
-        "        if (container == null) return null;\n"
-        "        File driveC = new File(container.getRootDir(), \\".wine/drive_c\\");\n"
-        "        String[] paths = {\n"
-        "                \\"Steam/steam.exe\\",\n"
-        "                \\"Program Files (x86)/Steam/steam.exe\\",\n"
-        "                \\"Program Files/Steam/steam.exe\\",\n"
-        "                \\"users/xuser/AppData/Local/Steam/steam.exe\\"\n"
-        "        };\n"
-        "        for (String path : paths) {\n"
-        "            File file = new File(driveC, path);\n"
-        "            if (file.isFile()) return file;\n"
-        "        }\n"
-        "        return findDroidDeckSteamRecursive(driveC, 0);\n"
-        "    }\n\n"
-        "    private File findDroidDeckSteamRecursive(File dir, int depth) {\n"
-        "        if (dir == null || !dir.isDirectory() || depth > 7) return null;\n"
-        "        if (\\"windows\\".equalsIgnoreCase(dir.getName())) return null;\n"
-        "        File[] children = dir.listFiles();\n"
-        "        if (children == null) return null;\n"
-        "        for (File child : children) {\n"
-        "            if (child.isFile() && \\"steam.exe\\".equalsIgnoreCase(child.getName())) return child;\n"
-        "        }\n"
-        "        for (File child : children) {\n"
-        "            if (child.isDirectory()) {\n"
-        "                File found = findDroidDeckSteamRecursive(child, depth + 1);\n"
-        "                if (found != null) return found;\n"
-        "            }\n"
-        "        }\n"
-        "        return null;\n"
-        "    }\n\n"
-        "    private void finishDroidDeckRuntime(int status) {\n"
-        "        if (droidDeckSteamWatchdog != null) {\n"
-        "            droidDeckSteamWatchdog.stop();\n"
-        "            droidDeckSteamWatchdog = null;\n"
-        "        }\n"
-        "        if (droidDeckRuntimeOverlay != null) {\n"
-        "            droidDeckRuntimeOverlay.close();\n"
-        "            droidDeckRuntimeOverlay = null;\n"
-        "        }\n"
-        "        Intent result = new Intent();\n"
-        "        result.putExtra(\\"droiddeck_runtime_exit_status\\", status);\n"
-        "        result.putExtra(\\"droiddeck_runtime_purpose\\", getIntent().getStringExtra(\\"droiddeck_purpose\\"));\n"
-        "        setResult(Activity.RESULT_OK, result);\n"
-        "        finish();\n"
-        "    }\n\n"
-    )
+    installer_methods = r'''    private void waitForDroidDeckSteamInstaller(int parentStatus, long waitStartedAt) {
+        if (isFinishing() || isDestroyed()) return;
+        File steamExe = findDroidDeckSteamExecutable();
+        long elapsed = android.os.SystemClock.elapsedRealtime() - waitStartedAt;
+        int seconds = (int)(elapsed / 1000L);
+
+        if (steamExe != null && steamExe.isFile()) {
+            ConsoleLogStore.append("OK", "Steam instalado: " + steamExe.getAbsolutePath());
+            if (droidDeckRuntimeOverlay != null) {
+                droidDeckRuntimeOverlay.stage("Steam", "steam.exe encontrado · instalación completada", 100);
+            }
+            getWindow().getDecorView().postDelayed(() -> finishDroidDeckRuntime(0), 350L);
+            return;
+        }
+
+        if (elapsed >= 120000L) {
+            ConsoleLogStore.append("ERROR", "SteamSetup terminó pero steam.exe no apareció tras 120 s.");
+            finishDroidDeckRuntime(parentStatus != 0 ? parentStatus : 66);
+            return;
+        }
+
+        int progress = Math.min(99, 96 + (seconds / 40));
+        if (droidDeckRuntimeOverlay != null) {
+            droidDeckRuntimeOverlay.stage(
+                    "Steam",
+                    "Finalizando instalación · esperando procesos hijos · " + seconds + " s",
+                    progress
+            );
+        }
+
+        if (seconds == 0 || seconds % 5 == 0) {
+            ConsoleLogStore.append(
+                    "INFO",
+                    "SteamSetup padre terminó; manteniendo Wine activo · " + seconds + " s"
+            );
+        }
+
+        getWindow().getDecorView().postDelayed(
+                () -> waitForDroidDeckSteamInstaller(parentStatus, waitStartedAt),
+                1000L
+        );
+    }
+
+    private File findDroidDeckSteamExecutable() {
+        if (container == null) return null;
+        File driveC = new File(container.getRootDir(), ".wine/drive_c");
+        String[] paths = {
+                "Steam/steam.exe",
+                "Program Files (x86)/Steam/steam.exe",
+                "Program Files/Steam/steam.exe",
+                "users/xuser/AppData/Local/Steam/steam.exe"
+        };
+
+        for (String path : paths) {
+            File file = new File(driveC, path);
+            if (file.isFile()) return file;
+        }
+
+        return findDroidDeckSteamRecursive(driveC, 0);
+    }
+
+    private File findDroidDeckSteamRecursive(File dir, int depth) {
+        if (dir == null || !dir.isDirectory() || depth > 7) return null;
+        if ("windows".equalsIgnoreCase(dir.getName())) return null;
+
+        File[] children = dir.listFiles();
+        if (children == null) return null;
+
+        for (File child : children) {
+            if (child.isFile() && "steam.exe".equalsIgnoreCase(child.getName())) return child;
+        }
+
+        for (File child : children) {
+            if (child.isDirectory()) {
+                File found = findDroidDeckSteamRecursive(child, depth + 1);
+                if (found != null) return found;
+            }
+        }
+
+        return null;
+    }
+
+    private void finishDroidDeckRuntime(int status) {
+        if (droidDeckSteamWatchdog != null) {
+            droidDeckSteamWatchdog.stop();
+            droidDeckSteamWatchdog = null;
+        }
+
+        if (droidDeckRuntimeOverlay != null) {
+            droidDeckRuntimeOverlay.close();
+            droidDeckRuntimeOverlay = null;
+        }
+
+        Intent result = new Intent();
+        result.putExtra("droiddeck_runtime_exit_status", status);
+        result.putExtra("droiddeck_runtime_purpose", getIntent().getStringExtra("droiddeck_purpose"));
+        setResult(Activity.RESULT_OK, result);
+        finish();
+    }
+
+'''
     if installer_anchor not in xtext:
         raise SystemExit("ancla instalador DroidDeck no encontrada")
     xtext = xtext.replace(installer_anchor, installer_methods + installer_anchor)
