@@ -233,7 +233,7 @@ if 'intent.getStringExtra("exec_args")' not in xtext:
 
 
 # Keep the Wine environment alive after SteamSetup's parent process exits.
-if 'waitForDroidDeckSteamInstaller' not in xtext:
+if 'private void waitForDroidDeckSteamInstaller' not in xtext:
     installer_anchor = "    private boolean isGenerateWineprefix() {"
     installer_methods = r'''    private void waitForDroidDeckSteamInstaller(int parentStatus, long waitStartedAt) {
         if (isFinishing() || isDestroyed()) return;
@@ -339,6 +339,14 @@ if 'waitForDroidDeckSteamInstaller' not in xtext:
     if installer_anchor not in xtext:
         raise SystemExit("ancla instalador DroidDeck no encontrada")
     xtext = xtext.replace(installer_anchor, installer_methods + installer_anchor)
+
+for token in [
+    "private void waitForDroidDeckSteamInstaller",
+    "private File findDroidDeckSteamExecutable",
+    "private void finishDroidDeckRuntime",
+]:
+    if token not in xtext:
+        raise SystemExit("métodos instalador DroidDeck no aplicados: falta " + token)
 
 # DroidDeck runtime telemetry: hide Winlator preloaders and expose real milestones.
 xtext = xtext.replace(
