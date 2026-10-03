@@ -75,7 +75,7 @@ manifest.write_text(text, encoding="utf-8")
 
 btext = build_gradle.read_text(encoding="utf-8")
 btext = btext.replace("applicationId 'com.winlator'", "applicationId 'com.droiddeck.console'")
-btext = btext.replace('versionName "11.2"', 'versionName "0.7.0-m7"')
+btext = btext.replace('versionName "11.2"', 'versionName "0.8.0-m8"')
 build_gradle.write_text(btext, encoding="utf-8")
 
 for strings in (src / "app/src/main/res").glob("values*/strings.xml"):
@@ -440,9 +440,12 @@ xtext = xtext.replace(
     "        environment.startEnvironmentComponents();\n\n"
     "        winHandler.start();\n"
     "        if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\"Steam\", \"Esperando la primera ventana real\", 95);\n"
-    "        if (droidDeckConsoleMode && droidDeckRuntimeOverlay != null && \"steam_client\".equals(getIntent().getStringExtra(\"droiddeck_purpose\"))) {\n"
-    "            droidDeckSteamWatchdog = new SteamRuntimeWatchdog(this, droidDeckRuntimeOverlay);\n"
-    "            droidDeckSteamWatchdog.start();\n"
+    "        if (droidDeckConsoleMode && droidDeckRuntimeOverlay != null) {\n"
+    "            String runtimePurpose = getIntent().getStringExtra(\"droiddeck_purpose\");\n"
+    "            if (\"steam_client\".equals(runtimePurpose) || \"steam_install\".equals(runtimePurpose)) {\n"
+    "                droidDeckSteamWatchdog = new SteamRuntimeWatchdog(this, droidDeckRuntimeOverlay, runtimePurpose);\n"
+    "                droidDeckSteamWatchdog.start();\n"
+    "            }\n"
     "        }"
 )
 
@@ -506,6 +509,7 @@ for token in [
     'droidDeckRuntimeOverlay.stage("Box64 + Wine"',
     'droidDeckRuntimeOverlay.ready("Ventana de Steam lista")',
     'droidDeckSteamWatchdog = new SteamRuntimeWatchdog',
+    '"steam_install".equals(runtimePurpose)',
     'if (!droidDeckConsoleMode) environment.onPause();',
     'if (!droidDeckConsoleMode) environment.onResume();',
 ]:
@@ -528,5 +532,5 @@ notification_utils.write_text(nutext, encoding="utf-8")
 
 apply_native_security_fixes(src)
 
-print("Overlay DroidDeck M7 aplicado.")
+print("Overlay DroidDeck M8 aplicado.")
 print("Base esperada:", EXPECTED_SHA)
