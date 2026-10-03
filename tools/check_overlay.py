@@ -26,7 +26,19 @@ for p in (root / "tools").glob("*.py"):
 controller = (root / "overlay/app/src/main/java/com/winlator/console/ConsoleBootstrapController.java").read_text()
 activity = (root / "overlay/app/src/main/java/com/winlator/ConsoleLauncherActivity.java").read_text()
 
-for token in ["SteamSetup.exe", '"/S"', "Range", "formatSpeed", "handleRuntimeResult", "retry()"]:
+for token in [
+    "SteamSetup.exe",
+    '"/S"',
+    "Range",
+    "formatSpeed",
+    "handleRuntimeResult",
+    "WineUtils.unixToDOSPath",
+    ".wine/drive_c/DroidDeck",
+    "waitForSteamAfterInstall",
+    "Tamaño incompleto",
+    "runtimeActive",
+    "retry()",
+]:
     if token not in controller:
         raise SystemExit(f"controlador incompleto: falta {token}")
 
@@ -34,4 +46,13 @@ for token in ["requestRequiredPermissions", "onActivityResult", "TVCurrentPercen
     if token not in activity:
         raise SystemExit(f"launcher incompleto: falta {token}")
 
-print("Overlay M3 válido: UI 50/50, progreso real, runtime retornable y diagnóstico presentes.")
+patcher = (root / "tools/apply_overlay.py").read_text()
+for token in [
+    "/data/data/com.droiddeck.console/",
+    "runOnUiThread",
+    'versionName \\"0.4.0-m4\\"',
+]:
+    if token not in patcher:
+        raise SystemExit(f"parche M4 incompleto: falta {token}")
+
+print("Overlay M4 válido: Steam en C:, rutas DroidDeck, progreso real, retorno seguro y diagnóstico presentes.")
