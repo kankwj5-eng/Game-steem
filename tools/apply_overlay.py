@@ -65,7 +65,10 @@ text = text.replace('android:authorities="com.winlator.FileProvider"', 'android:
 text = text.replace('android:label="@string/app_name">', 'android:label="DroidDeck">')
 text = text.replace('android:name="com.winlator.ConsoleLauncherActivity"\n            android:theme=', 'android:name="com.winlator.ConsoleLauncherActivity"\n            android:label="DroidDeck"\n            android:icon="@drawable/ic_droiddeck_logo"\n            android:theme=')
 if "android:requestLegacyExternalStorage=" not in text:
-    text = text.replace('android:label="@string/app_name">', 'android:label="@string/app_name"\n        android:requestLegacyExternalStorage="true">')
+    if 'android:label="DroidDeck">' in text:
+        text = text.replace('android:label="DroidDeck">', 'android:label="DroidDeck"\n        android:requestLegacyExternalStorage="true">', 1)
+    else:
+        text = text.replace('android:label="@string/app_name">', 'android:label="@string/app_name"\n        android:requestLegacyExternalStorage="true">', 1)
 manifest.write_text(text, encoding="utf-8")
 
 btext = build_gradle.read_text(encoding="utf-8")
