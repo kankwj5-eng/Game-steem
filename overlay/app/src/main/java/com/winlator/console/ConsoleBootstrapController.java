@@ -101,6 +101,8 @@ public final class ConsoleBootstrapController {
                 .putBoolean("enable_wine_debug", true)
                 .putString("wine_debug_channels", "warn,err,fixme")
                 .putInt("box64_logs", 1)
+                .putBoolean("enable_background_protection", true)
+                .putBoolean("enable_background_wakelock", true)
                 .apply();
 
         update("system", "Sistema", "Verificando RootFS", BootstrapStep.State.RUNNING, 5);
@@ -141,11 +143,8 @@ public final class ConsoleBootstrapController {
         if (steam != null) {
             update("steam", "Steam", "Cliente instalado", BootstrapStep.State.DONE, 100);
             listener.onReady(true);
-            if (pendingAutoLaunch) {
-                pendingAutoLaunch = false;
-                installerStarted = false;
-                main.postDelayed(this::startSteam, 450);
-            }
+            pendingAutoLaunch = false;
+            installerStarted = false;
         }
         else if (installerStarted) {
             installerStarted = false;
@@ -328,7 +327,7 @@ public final class ConsoleBootstrapController {
         connection.setConnectTimeout(15_000);
         connection.setReadTimeout(60_000);
         connection.setInstanceFollowRedirects(true);
-        connection.setRequestProperty("User-Agent", "DroidDeck/0.4 Android");
+        connection.setRequestProperty("User-Agent", "DroidDeck/0.5 Android");
         if (existing > 0) connection.setRequestProperty("Range", "bytes=" + existing + "-");
         connection.connect();
 
@@ -412,7 +411,7 @@ public final class ConsoleBootstrapController {
         }
 
         installerStarted = true;
-        pendingAutoLaunch = true;
+        pendingAutoLaunch = false;
         update("steam", "Steam", "Instalando automáticamente · C:\\DroidDeck\\SteamSetup.exe", BootstrapStep.State.RUNNING, 98);
         ConsoleLogStore.ok("Instalador listo · " + formatBytes(installer.length()) + " · " + dosPath);
         ConsoleLogStore.info("Ejecutando " + dosPath + " /S dentro de Wine.");
@@ -479,10 +478,8 @@ public final class ConsoleBootstrapController {
             update("steam", "Steam", "Instalación completada", BootstrapStep.State.DONE, 100);
             ConsoleLogStore.ok("steam.exe encontrado: " + steam.getAbsolutePath());
             listener.onReady(true);
-            if (pendingAutoLaunch) {
-                pendingAutoLaunch = false;
-                main.postDelayed(this::startSteam, 350);
-            }
+            pendingAutoLaunch = false;
+            update("launch", "Inicio", "Todo listo · inicia Steam cuando quieras", BootstrapStep.State.WAITING, 0);
             return;
         }
 
