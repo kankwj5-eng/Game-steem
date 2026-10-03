@@ -149,8 +149,14 @@ public final class ConsoleBootstrapController {
         }
         else if (installerStarted) {
             installerStarted = false;
-            pendingAutoLaunch = false;
-            fail("steam", "El instalador terminó, pero Steam no apareció en el prefijo");
+            ConsoleLogStore.warn("El runtime volvió sin steam.exe; continuando con la estrategia automática.");
+            if (!steamFallbackStarted) {
+                startWinlatorSteamFallback();
+            }
+            else {
+                pendingAutoLaunch = false;
+                fail("steam", "Los dos métodos de instalación terminaron sin producir steam.exe");
+            }
         }
     }
 
