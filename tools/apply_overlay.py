@@ -21,8 +21,10 @@ winlator_h = src / "app/src/main/cpp/winlator/include/winlator.h"
 vortek_h = src / "app/src/main/cpp/vortekrenderer/include/vortek.h"
 gladio_h = src / "app/src/main/cpp/gladiorenderer/include/gladio.h"
 xserver = src / "app/src/main/java/com/winlator/XServerDisplayActivity.java"
+foreground_service = src / "app/src/main/java/com/winlator/services/ForegroundService.java"
+notification_utils = src / "app/src/main/java/com/winlator/services/NotificationUtils.java"
 
-for required in (manifest, rootfs, build_gradle, file_utils, app_utils, winlator_h, vortek_h, gladio_h, xserver):
+for required in (manifest, rootfs, build_gradle, file_utils, app_utils, winlator_h, vortek_h, gladio_h, xserver, foreground_service, notification_utils):
     if not required.exists():
         raise SystemExit(f"árbol Winlator inválido; falta {required}")
 
@@ -66,7 +68,7 @@ manifest.write_text(text, encoding="utf-8")
 
 btext = build_gradle.read_text(encoding="utf-8")
 btext = btext.replace("applicationId 'com.winlator'", "applicationId 'com.droiddeck.console'")
-btext = btext.replace('versionName "11.2"', 'versionName "0.4.0-m4"')
+btext = btext.replace('versionName "11.2"', 'versionName "0.5.0-m5"')
 build_gradle.write_text(btext, encoding="utf-8")
 
 for strings in (src / "app/src/main/res").glob("values*/strings.xml"):
@@ -139,17 +141,17 @@ xtext = xserver.read_text(encoding="utf-8")
 if "import com.winlator.console.ConsoleLogStore;" not in xtext:
     xtext = xtext.replace(
         "import com.winlator.contentdialog.WineD3DConfigDialog;",
-        "import com.winlator.contentdialog.WineD3DConfigDialog;\nimport com.winlator.console.ConsoleLogStore;"
+        "import com.winlator.contentdialog.WineD3DConfigDialog;\nimport com.winlator.console.ConsoleLogStore;\nimport com.winlator.console.RuntimeConsoleOverlay;"
     )
 if "private boolean droidDeckConsoleMode;" not in xtext:
     xtext = xtext.replace(
         "private String screenEffectProfile;",
-        "private String screenEffectProfile;\n    private boolean droidDeckConsoleMode;"
+        "private String screenEffectProfile;\n    private boolean droidDeckConsoleMode;\n    private RuntimeConsoleOverlay droidDeckRuntimeOverlay;"
     )
 if 'droidDeckConsoleMode = getIntent().getBooleanExtra("droiddeck_console", false);' not in xtext:
     xtext = xtext.replace(
         "ForegroundService.startSession(this);",
-        "ForegroundService.startSession(this);\n        droidDeckConsoleMode = getIntent().getBooleanExtra(\"droiddeck_console\", false);"
+        "ForegroundService.startSession(this);\n        droidDeckConsoleMode = getIntent().getBooleanExtra(\"droiddeck_console\", false);\n        if (droidDeckConsoleMode) {\n            ConsoleLogStore.initialize(this);\n            droidDeckRuntimeOverlay = new RuntimeConsoleOverlay(this);\n            droidDeckRuntimeOverlay.stage(\"Motor\", \"Validando contenedor y prefijo\", 6);\n        }"
     )
 if 'ConsoleLogStore.append("RUNTIME", line)' not in xtext:
     xtext = xtext.replace(
@@ -226,5 +228,17 @@ if 'intent.getStringExtra("exec_args")' not in xtext:
 
 xserver.write_text(xtext, encoding="utf-8")
 
-print("Overlay DroidDeck M4 aplicado.")
+# Rebrand foreground runtime service and keep DroidDeck sessions alive when backgrounded.
+fgtext = foreground_service.read_text(encoding="utf-8")
+fgtext = fgtext.replace('"Winlator:ForegroundService"', '"DroidDeck:ForegroundService"')
+fgtext = fgtext.replace('"Winlator"', '"DroidDeck"')
+foreground_service.write_text(fgtext, encoding="utf-8")
+
+nutext = notification_utils.read_text(encoding="utf-8")
+nutext = nutext.replace('"winlator_foreground_service"', '"droiddeck_foreground_service"')
+nutext = nutext.replace('"Winlator Foreground Service"', '"DroidDeck en segundo plano"')
+nutext = nutext.replace('"Allows to display Winlator foreground notifications"', '"Mantiene Steam y el motor de DroidDeck activos en segundo plano"')
+notification_utils.write_text(nutext, encoding="utf-8")
+
+print("Overlay DroidDeck M5 aplicado.")
 print("Base esperada:", EXPECTED_SHA)
