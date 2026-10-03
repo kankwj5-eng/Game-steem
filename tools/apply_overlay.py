@@ -60,8 +60,10 @@ if "com.winlator.ConsoleLauncherActivity" not in text:
 """
     text = text.replace(main_block, clean_main + console_block)
 
-text = text.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/ic_droiddeck_logo"')
+text = text.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/ic_droiddeck_logo"\n        android:roundIcon="@drawable/ic_droiddeck_logo"')
 text = text.replace('android:authorities="com.winlator.FileProvider"', 'android:authorities="com.droiddeck.console.FileProvider"')
+text = text.replace('android:label="@string/app_name">', 'android:label="DroidDeck">')
+text = text.replace('android:name="com.winlator.ConsoleLauncherActivity"\n            android:theme=', 'android:name="com.winlator.ConsoleLauncherActivity"\n            android:label="DroidDeck"\n            android:icon="@drawable/ic_droiddeck_logo"\n            android:theme=')
 if "android:requestLegacyExternalStorage=" not in text:
     text = text.replace('android:label="@string/app_name">', 'android:label="@string/app_name"\n        android:requestLegacyExternalStorage="true">')
 manifest.write_text(text, encoding="utf-8")
