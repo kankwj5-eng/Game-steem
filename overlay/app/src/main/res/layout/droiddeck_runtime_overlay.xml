@@ -86,6 +86,16 @@
             android:max="100" />
 
         <TextView
+            android:id="@+id/TVRuntimeTelemetry"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:fontFamily="monospace"
+            android:text="Esperando telemetría…"
+            android:textColor="#C9D3EB"
+            android:textSize="11sp" />
+
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
