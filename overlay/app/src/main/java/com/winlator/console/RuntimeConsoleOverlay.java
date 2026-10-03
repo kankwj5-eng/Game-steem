@@ -23,6 +23,7 @@ public final class RuntimeConsoleOverlay implements ConsoleLogStore.Listener {
     private final TextView stepAudio;
     private final TextView stepRuntime;
     private final TextView stepWindow;
+    private final TextView telemetry;
     private final ProgressBar progress;
     private final ScrollView logScroll;
     private boolean closed;
@@ -41,6 +42,7 @@ public final class RuntimeConsoleOverlay implements ConsoleLogStore.Listener {
         this.stepAudio = root.findViewById(R.id.TVRuntimeAudio);
         this.stepRuntime = root.findViewById(R.id.TVRuntimeBox64);
         this.stepWindow = root.findViewById(R.id.TVRuntimeWindow);
+        this.telemetry = root.findViewById(R.id.TVRuntimeTelemetry);
 
         activity.addContentView(root, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -59,6 +61,7 @@ public final class RuntimeConsoleOverlay implements ConsoleLogStore.Listener {
             stage.setText(title);
             detail.setText(message);
             percent.setText(safe + "%");
+            progress.setIndeterminate(false);
             progress.setProgress(safe);
             updateSteps(safe);
             root.bringToFront();
@@ -89,9 +92,53 @@ public final class RuntimeConsoleOverlay implements ConsoleLogStore.Listener {
         }
     }
 
+    public void waitingTelemetry(long elapsedMs, String diagnosis, String processSummary, int processCount,
+                                 int windowCount, long receivedBytes, double receiveBytesPerSecond) {
+        if (closed) return;
+        final long seconds = Math.max(0L, elapsedMs / 1000L);
+        final String rate = formatRate(receiveBytesPerSecond);
+        final String total = formatBytes(receivedBytes);
+        final boolean possibleStall = seconds >= 60 && receiveBytesPerSecond < 4096.0 && windowCount == 0;
+
+        activity.runOnUiThread(() -> {
+            if (closed) return;
+            stage.setText(possibleStall ? "Steam · posible bloqueo" : "Steam");
+            detail.setText(diagnosis);
+            percent.setText("95% · " + seconds + " s");
+            progress.setIndeterminate(true);
+            telemetry.setText(
+                    "Procesos Windows: " + processCount +
+                    "   ·   Ventanas: " + windowCount + "\n" +
+                    "Red runtime: " + rate + "   ·   Recibido: " + total + "\n" +
+                    "Activos: " + (processSummary == null || processSummary.isEmpty() ? "[sin datos]" : processSummary)
+            );
+            if (possibleStall) {
+                telemetry.setTextColor(activity.getResources().getColor(R.color.console_warn));
+            }
+            else telemetry.setTextColor(Color.parseColor("#C9D3EB"));
+            root.bringToFront();
+        });
+    }
+
+    private String formatBytes(long bytes) {
+        if (bytes < 0) return "n/d";
+        if (bytes >= 1024L * 1024L * 1024L) return String.format(java.util.Locale.US, "%.2f GB", bytes / 1073741824.0);
+        if (bytes >= 1024L * 1024L) return String.format(java.util.Locale.US, "%.1f MB", bytes / 1048576.0);
+        if (bytes >= 1024L) return String.format(java.util.Locale.US, "%.0f KB", bytes / 1024.0);
+        return bytes + " B";
+    }
+
+    private String formatRate(double bytesPerSecond) {
+        if (bytesPerSecond < 0) return "n/d";
+        if (bytesPerSecond >= 1024.0 * 1024.0) return String.format(java.util.Locale.US, "%.1f MB/s", bytesPerSecond / 1048576.0);
+        if (bytesPerSecond >= 1024.0) return String.format(java.util.Locale.US, "%.0f KB/s", bytesPerSecond / 1024.0);
+        return String.format(java.util.Locale.US, "%.0f B/s", bytesPerSecond);
+    }
+
     public void ready(String message) {
         if (closed) return;
         stage("Listo", message, 100);
+        activity.runOnUiThread(() -> telemetry.setText("Steam creó una ventana real en XServer."));
         activity.runOnUiThread(() -> {
             if (closed) return;
             root.animate()
