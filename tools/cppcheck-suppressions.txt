@@ -1,0 +1,14 @@
+# Falsos positivos auditados. Mantener cada supresión limitada a archivo + regla.
+# Vortek: vt_unserialize_* escribe estos IDs mediante código generado que cppcheck no modela.
+uninitvar:*/vortekrenderer/src/request_handler.c
+uninitvar:*/vortekrenderer/src/timeline_semaphore.c
+
+# Macros definidos por la configuración/preprocesador real del proyecto.
+unknownMacro:*/gladiorenderer/src/shader_converter.c
+unknownMacro:*/gladiorenderer/src/shader_material.c
+unknownMacro:*/virglrenderer/src/gallium/auxiliary/tgsi/tgsi_sanity.c
+unknownMacro:*/virglrenderer/src/vrend_renderer.c
+
+# ARBVariable.name pasa a ser propiedad del ArrayMap/ARBProgram y se libera en destroyARBProgram.
+# cppcheck no modela ownership a través de ArrayMap_put.
+memleak:*/gladiorenderer/src/arb_program.c
