@@ -197,6 +197,7 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
 
     @Override
     protected void onDestroy() {
+        if (controller != null) controller.destroy();
         ConsoleLogStore.removeListener(this);
         super.onDestroy();
     }
