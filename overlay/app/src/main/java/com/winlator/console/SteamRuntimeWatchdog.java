@@ -367,7 +367,7 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
         boolean stalled = elapsed >= STALL_MS && idleMs >= STALL_MS && windowCount == 0;
 
         String diagnosis;
-        if ("steam_install".equals(purpose)) {
+        if ("steam_install".equals(purpose) || "steam_fallback".equals(purpose)) {
             if (rxRate >= 8 * 1024.0 && fileWriteRate >= 8 * 1024.0) {
                 diagnosis = "SteamSetup está descargando y escribiendo archivos";
             }
