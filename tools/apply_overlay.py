@@ -4,6 +4,8 @@ import shutil
 import sys
 import re
 
+from native_security_fixes import apply_native_security_fixes
+
 EXPECTED_SHA = "3981d86efa4f333b2a34a7da8b6521476cd8c8b9"
 
 if len(sys.argv) != 2:
@@ -523,6 +525,8 @@ nutext = nutext.replace('"winlator_foreground_service"', '"droiddeck_foreground_
 nutext = nutext.replace('"Winlator Foreground Service"', '"DroidDeck en segundo plano"')
 nutext = nutext.replace('"Allows to display Winlator foreground notifications"', '"Mantiene Steam y el motor de DroidDeck activos en segundo plano"')
 notification_utils.write_text(nutext, encoding="utf-8")
+
+apply_native_security_fixes(src)
 
 print("Overlay DroidDeck M7 aplicado.")
 print("Base esperada:", EXPECTED_SHA)
