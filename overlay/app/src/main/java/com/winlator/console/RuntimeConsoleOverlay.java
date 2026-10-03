@@ -92,30 +92,52 @@ public final class RuntimeConsoleOverlay implements ConsoleLogStore.Listener {
         }
     }
 
-    public void waitingTelemetry(long elapsedMs, String diagnosis, String processSummary, int processCount,
-                                 int windowCount, long receivedBytes, double receiveBytesPerSecond) {
+    public void waitingTelemetry(long elapsedMs, String diagnosis, String processSummary,
+                                 int windowsProcessCount, int linuxProcessCount, int windowCount,
+                                 long receivedBytes, double receiveBytesPerSecond,
+                                 int fileCount, long fileBytes, double fileWriteBytesPerSecond,
+                                 String lastFile, long idleMs, boolean winHandlerResponded,
+                                 boolean stalled) {
         if (closed) return;
+
         final long seconds = Math.max(0L, elapsedMs / 1000L);
-        final String rate = formatRate(receiveBytesPerSecond);
-        final String total = formatBytes(receivedBytes);
-        final boolean possibleStall = seconds >= 60 && receiveBytesPerSecond < 4096.0 && windowCount == 0;
+        final long idleSeconds = Math.max(0L, idleMs / 1000L);
+        final String networkRate = formatRate(receiveBytesPerSecond);
+        final String networkTotal = formatBytes(receivedBytes);
+        final String diskRate = formatRate(fileWriteBytesPerSecond);
+        final String diskTotal = formatBytes(fileBytes);
+        final String safeFile = lastFile == null || lastFile.isEmpty() ? "[sin archivo reciente]" : lastFile;
 
         activity.runOnUiThread(() -> {
             if (closed) return;
-            stage.setText(possibleStall ? "Steam · posible bloqueo" : "Steam");
+
+            stage.setText(stalled ? "Steam · posible bloqueo real" : "Steam");
             detail.setText(diagnosis);
             percent.setText("95% · " + seconds + " s");
             progress.setIndeterminate(true);
+
             telemetry.setText(
-                    "Procesos Windows: " + processCount +
-                    "   ·   Ventanas: " + windowCount + "\n" +
-                    "Red runtime: " + rate + "   ·   Recibido: " + total + "\n" +
-                    "Activos: " + (processSummary == null || processSummary.isEmpty() ? "[sin datos]" : processSummary)
+                    "RED    " + networkRate + "   ·   sesión " + networkTotal + "\n" +
+                    "DISCO  " + diskRate + "   ·   " + fileCount + " archivos / " + diskTotal + "\n" +
+                    "ÚLTIMO " + safeFile + "\n" +
+                    "PROC   Windows " + windowsProcessCount +
+                    " · Linux/Box64 " + linuxProcessCount +
+                    " · ventanas " + windowCount + "\n" +
+                    "WINHANDLER " + (winHandlerResponded ? "responde" : "sin respuesta todavía") +
+                    "   ·   sin actividad " + idleSeconds + " s\n" +
+                    "ACTIVOS " + (processSummary == null || processSummary.isEmpty() ? "[sin datos]" : processSummary)
             );
-            if (possibleStall) {
+
+            if (stalled) {
+                telemetry.setTextColor(activity.getResources().getColor(R.color.console_error));
+            }
+            else if (idleSeconds >= 30) {
                 telemetry.setTextColor(activity.getResources().getColor(R.color.console_warn));
             }
-            else telemetry.setTextColor(Color.parseColor("#C9D3EB"));
+            else {
+                telemetry.setTextColor(Color.parseColor("#C9D3EB"));
+            }
+
             root.bringToFront();
         });
     }
