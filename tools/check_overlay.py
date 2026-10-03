@@ -15,6 +15,7 @@ required = [
     root / "overlay/app/src/main/res/layout/droiddeck_runtime_overlay.xml",
     root / "overlay/app/src/main/res/layout/console_launcher_activity.xml",
     root / "overlay/app/src/main/res/drawable/console_status_chip.xml",
+    root / "overlay/app/src/main/res/drawable/ic_droiddeck_logo.xml",
 ]
 for p in required:
     if not p.is_file():
@@ -60,7 +61,7 @@ patcher = (root / "tools/apply_overlay.py").read_text()
 for token in [
     "/data/data/com.droiddeck.console/",
     "runOnUiThread",
-    'versionName "0.6.0-m6"',
+    'versionName "0.7.0-m7"',
     "SteamRuntimeWatchdog",
     "droidDeckSteamWatchdog = new SteamRuntimeWatchdog",
     'android:label="DroidDeck"',
@@ -72,8 +73,19 @@ for token in [
     'droidDeckRuntimeOverlay.stage("Box64 + Wine"',
     'droidDeckRuntimeOverlay.ready("Ventana de Steam lista")',
     "DroidDeck:ForegroundService",
+    "waitForDroidDeckSteamInstaller",
+    "findDroidDeckSteamExecutable",
+    "finishDroidDeckRuntime",
+    "120000L",
+    "steam.exe no apareció tras 120 s",
 ]:
     if token not in patcher:
-        raise SystemExit(f"parche M5 incompleto: falta {token}")
+        raise SystemExit(f"parche M7 incompleto: falta {token}")
 
-print("Overlay M6 válido: Steam C:\\Steam, watchdog vivo, tráfico/procesos y branding DroidDeck.")
+launcher_xml = (root / "overlay/app/src/main/res/layout/console_launcher_activity.xml").read_text()
+runtime_xml = (root / "overlay/app/src/main/res/layout/droiddeck_runtime_overlay.xml").read_text()
+for token in ['@drawable/ic_droiddeck_logo', 'DROIDDECK']:
+    if token not in launcher_xml or token not in runtime_xml:
+        raise SystemExit(f"branding M7 incompleto: falta {token}")
+
+print("Overlay M7 válido: instalador espera hijos, watchdog vivo, Steam C:\\Steam y branding DroidDeck integrado.")
