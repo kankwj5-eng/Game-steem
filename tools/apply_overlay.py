@@ -16,9 +16,13 @@ manifest = src / "app/src/main/AndroidManifest.xml"
 rootfs = src / "app/src/main/java/com/winlator/xenvironment/RootFSInstaller.java"
 build_gradle = src / "app/build.gradle"
 file_utils = src / "app/src/main/java/com/winlator/core/FileUtils.java"
+app_utils = src / "app/src/main/java/com/winlator/core/AppUtils.java"
+winlator_h = src / "app/src/main/cpp/winlator/include/winlator.h"
+vortek_h = src / "app/src/main/cpp/vortekrenderer/include/vortek.h"
+gladio_h = src / "app/src/main/cpp/gladiorenderer/include/gladio.h"
 xserver = src / "app/src/main/java/com/winlator/XServerDisplayActivity.java"
 
-for required in (manifest, rootfs, build_gradle, file_utils, xserver):
+for required in (manifest, rootfs, build_gradle, file_utils, app_utils, winlator_h, vortek_h, gladio_h, xserver):
     if not required.exists():
         raise SystemExit(f"árbol Winlator inválido; falta {required}")
 
@@ -62,7 +66,7 @@ manifest.write_text(text, encoding="utf-8")
 
 btext = build_gradle.read_text(encoding="utf-8")
 btext = btext.replace("applicationId 'com.winlator'", "applicationId 'com.droiddeck.console'")
-btext = btext.replace('versionName "11.2"', 'versionName "0.3.0-m3"')
+btext = btext.replace('versionName "11.2"', 'versionName "0.4.0-m4"')
 build_gradle.write_text(btext, encoding="utf-8")
 
 for strings in (src / "app/src/main/res").glob("values*/strings.xml"):
@@ -73,6 +77,16 @@ for strings in (src / "app/src/main/res").glob("values*/strings.xml"):
 ftext = file_utils.read_text(encoding="utf-8")
 ftext = ftext.replace('"com.winlator.FileProvider"', '"com.droiddeck.console.FileProvider"')
 file_utils.write_text(ftext, encoding="utf-8")
+
+# Hardcoded upstream package paths must follow DroidDeck's applicationId.
+atext = app_utils.read_text(encoding="utf-8")
+atext = atext.replace("/data/data/com.winlator/storage", "/data/data/com.droiddeck.console/storage")
+app_utils.write_text(atext, encoding="utf-8")
+
+for native_file in (winlator_h, vortek_h, gladio_h):
+    ntext = native_file.read_text(encoding="utf-8")
+    ntext = ntext.replace("/data/data/com.winlator/", "/data/data/com.droiddeck.console/")
+    native_file.write_text(ntext, encoding="utf-8")
 
 rtext = rootfs.read_text(encoding="utf-8")
 rtext = rtext.replace(
@@ -176,14 +190,17 @@ if 'droiddeck_runtime_exit_status' not in xtext:
     new_termination = (
         '        guestProgramLauncherComponent.setTerminationCallback((status) -> {\n'
         '            if (droidDeckConsoleMode) {\n'
-        '                ConsoleLogStore.append("RUNTIME", "Proceso finalizado con código " + status);\n'
-        '                Intent result = new Intent();\n'
-        '                result.putExtra("droiddeck_runtime_exit_status", status);\n'
-        '                result.putExtra("droiddeck_runtime_purpose", getIntent().getStringExtra("droiddeck_purpose"));\n'
-        '                setResult(Activity.RESULT_OK, result);\n'
-        '                finish();\n'
+        '                runOnUiThread(() -> {\n'
+        '                    if (isFinishing() || isDestroyed()) return;\n'
+        '                    ConsoleLogStore.append("RUNTIME", "Proceso finalizado con código " + status);\n'
+        '                    Intent result = new Intent();\n'
+        '                    result.putExtra("droiddeck_runtime_exit_status", status);\n'
+        '                    result.putExtra("droiddeck_runtime_purpose", getIntent().getStringExtra("droiddeck_purpose"));\n'
+        '                    setResult(Activity.RESULT_OK, result);\n'
+        '                    finish();\n'
+        '                });\n'
         '            }\n'
-        '            else exit();\n'
+        '            else runOnUiThread(this::exit);\n'
         '        });'
     )
     if old_termination not in xtext:
@@ -209,5 +226,5 @@ if 'intent.getStringExtra("exec_args")' not in xtext:
 
 xserver.write_text(xtext, encoding="utf-8")
 
-print("Overlay DroidDeck M2 aplicado.")
+print("Overlay DroidDeck M4 aplicado.")
 print("Base esperada:", EXPECTED_SHA)
