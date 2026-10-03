@@ -62,6 +62,7 @@ for forbidden in [
 installer = (root / "overlay/app/src/main/java/com/winlator/console/SteamLegacyInstaller.java").read_text()
 for token in [
     "steam-legacy.7z",
+    "https://github.com/brunodev85/winlator-addons/releases/download/v1.0.0/steam-legacy.7z",
     "winlator-addons/releases/download/v1.0.0",
     "windows/temp",
     "SevenZFile",
