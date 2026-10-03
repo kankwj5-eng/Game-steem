@@ -44,12 +44,12 @@ for token in [
     "retry()",
     "Box64",
     "installSteamLegacy",
-    "BOOT · DroidDeck M13 ·",
+    "BOOT · DroidDeck M14 ·",
 ]:
     if token not in controller:
-        raise SystemExit(f"controlador M13 incompleto: falta {token}")
+        raise SystemExit(f"controlador M14 incompleto: falta {token}")
 
-# M13 must not regress to hidden Windows installers.
+# M14 must not regress to hidden Windows installers.
 for forbidden in [
     "SteamSetup.exe",
     "steam_install",
@@ -58,7 +58,7 @@ for forbidden in [
     "waitForSteamAfterInstall",
 ]:
     if forbidden in controller:
-        raise SystemExit(f"controlador M13 conserva ruta antigua prohibida: {forbidden}")
+        raise SystemExit(f"controlador M14 conserva ruta antigua prohibida: {forbidden}")
 
 installer = (root / "overlay/app/src/main/java/com/winlator/console/SteamLegacyInstaller.java").read_text()
 for token in [
@@ -99,7 +99,7 @@ for token in [
     "sessionActive.get() || installerActive.get()",
 ]:
     if token not in foreground:
-        raise SystemExit(f"ForegroundService M13 incompleto: falta {token}")
+        raise SystemExit(f"ForegroundService M14 incompleto: falta {token}")
 
 activity = (root / "overlay/app/src/main/java/com/winlator/ConsoleLauncherActivity.java").read_text()
 for token in [
@@ -119,6 +119,9 @@ for token in [
     "scanSteamFiles",
     "POSIBLE BLOQUEO REAL",
     "fileWriteRate",
+    "FILE_SCAN_MS = 5000L",
+    "previousFileSampleAt",
+    "int[] budget = {8000}",
 ]:
     if token not in watchdog:
         raise SystemExit(f"watchdog incompleto: falta {token}")
@@ -146,7 +149,7 @@ for token in [
     "public static synchronized void flush()",
 ]:
     if token not in console_log:
-        raise SystemExit(f"log M13 no optimizado: falta {token}")
+        raise SystemExit(f"log M14 no optimizado: falta {token}")
 
 security_fixes = (root / "tools/native_security_fixes.py").read_text()
 for token in [
@@ -167,7 +170,7 @@ patcher = (root / "tools/apply_overlay.py").read_text()
 for token in [
     "/data/data/com.droiddeck.console/",
     "runOnUiThread",
-    'versionName "1.0.0-m13"',
+    'versionName "1.0.0-m14"',
     "SteamRuntimeWatchdog",
     "droidDeckSteamWatchdog = new SteamRuntimeWatchdog",
     'android:label="DroidDeck"',
@@ -185,12 +188,12 @@ for token in [
     "xz:1.12",
 ]:
     if token not in patcher:
-        raise SystemExit(f"parche M13 incompleto: falta {token}")
+        raise SystemExit(f"parche M14 incompleto: falta {token}")
 
 launcher_xml = (root / "overlay/app/src/main/res/layout/console_launcher_activity.xml").read_text()
 runtime_xml = (root / "overlay/app/src/main/res/layout/droiddeck_runtime_overlay.xml").read_text()
 for token in ['@drawable/ic_droiddeck_logo', 'DROIDDECK']:
     if token not in launcher_xml or token not in runtime_xml:
-        raise SystemExit(f"branding M13 incompleto: falta {token}")
+        raise SystemExit(f"branding M14 incompleto: falta {token}")
 
-print("Overlay M13 válido: instalación Steam Legacy nativa, telemetría y seguridad integradas.")
+print("Overlay M14 válido: instalación Steam Legacy nativa, telemetría y seguridad integradas.")
