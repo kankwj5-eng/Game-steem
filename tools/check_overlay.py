@@ -37,6 +37,8 @@ for token in [
     "waitForSteamAfterInstall",
     "Tamaño incompleto",
     "runtimeActive",
+    "enable_background_protection",
+    "enable_background_wakelock",
     "retry()",
 ]:
     if token not in controller:
@@ -46,13 +48,26 @@ for token in ["requestRequiredPermissions", "onActivityResult", "TVCurrentPercen
     if token not in activity:
         raise SystemExit(f"launcher incompleto: falta {token}")
 
+runtime_overlay = (root / "overlay/app/src/main/java/com/winlator/console/RuntimeConsoleOverlay.java").read_text()
+for token in ["ARRANQUE", "Wine y prefijo", "Vortek / Gladio", "Box64 + Wine", "Ventana de Steam"]:
+    if token not in runtime_overlay:
+        raise SystemExit(f"overlay runtime incompleto: falta {token}")
+
 patcher = (root / "tools/apply_overlay.py").read_text()
 for token in [
     "/data/data/com.droiddeck.console/",
     "runOnUiThread",
-    'versionName "0.4.0-m4"',
+    'versionName "0.5.0-m5"',
+    "RuntimeConsoleOverlay",
+    'droidDeckRuntimeOverlay.stage("Wine"',
+    'droidDeckRuntimeOverlay.stage("Gráficos"',
+    'droidDeckRuntimeOverlay.stage("Audio"',
+    'droidDeckRuntimeOverlay.stage("Box64 + Wine"',
+    'droidDeckRuntimeOverlay.ready("Ventana de Steam lista")',
+    "enable_background_protection",
+    "DroidDeck:ForegroundService",
 ]:
     if token not in patcher:
         raise SystemExit(f"parche M4 incompleto: falta {token}")
 
-print("Overlay M4 válido: Steam en C:, rutas DroidDeck, progreso real, retorno seguro y diagnóstico presentes.")
+print("Overlay M5 válido: Winlator oculto, telemetría real, Steam manual y segundo plano activos.")
