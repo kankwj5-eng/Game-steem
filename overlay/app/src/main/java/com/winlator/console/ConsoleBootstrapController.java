@@ -19,6 +19,7 @@ import com.winlator.container.Container;
 import com.winlator.container.ContainerManager;
 import com.winlator.container.GraphicsDrivers;
 import com.winlator.core.GPUHelper;
+import com.winlator.core.FileUtils;
 import com.winlator.core.WineThemeManager;
 import com.winlator.core.WineUtils;
 import com.winlator.xenvironment.RootFS;
@@ -65,6 +66,7 @@ public final class ConsoleBootstrapController {
     private boolean installerStarted;
     private boolean pendingAutoLaunch;
     private boolean runtimeActive;
+    private boolean steamFallbackStarted;
 
     public ConsoleBootstrapController(AppCompatActivity activity, Listener listener) {
         this.activity = activity;
@@ -255,6 +257,7 @@ public final class ConsoleBootstrapController {
         installerStarted = false;
         pendingAutoLaunch = false;
         runtimeActive = false;
+        steamFallbackStarted = false;
         if (steamContainer == null) {
             prepared = false;
             preparing = false;
@@ -326,7 +329,7 @@ public final class ConsoleBootstrapController {
         connection.setConnectTimeout(15_000);
         connection.setReadTimeout(60_000);
         connection.setInstanceFollowRedirects(true);
-        connection.setRequestProperty("User-Agent", "DroidDeck/0.8 Android");
+        connection.setRequestProperty("User-Agent", "DroidDeck/0.9 Android");
         if (existing > 0) connection.setRequestProperty("Range", "bytes=" + existing + "-");
         connection.connect();
 
@@ -411,9 +414,9 @@ public final class ConsoleBootstrapController {
 
         installerStarted = true;
         pendingAutoLaunch = false;
-        update("steam", "Steam", "Instalando automáticamente en C:\\Steam", BootstrapStep.State.RUNNING, 98);
+        update("steam", "Steam", "Método 1/2 · instalador oficial en C:\\Steam", BootstrapStep.State.RUNNING, 98);
         ConsoleLogStore.ok("Instalador listo · " + formatBytes(installer.length()) + " · " + dosPath);
-        ConsoleLogStore.info("Ejecutando " + dosPath + " /S /D=C:\\Steam dentro de Wine.");
+        ConsoleLogStore.info("Solicitando ejecución oficial: " + dosPath + " /S /D=C:\\Steam");
         launchWindowsExecutable(installer, "/S /D=C:\\Steam", "steam_install");
     }
 
@@ -449,11 +452,18 @@ public final class ConsoleBootstrapController {
         if ("steam_install".equals(purpose)) {
             installerStarted = false;
             if (status != 0) {
-                pendingAutoLaunch = false;
-                fail("steam", "SteamSetup terminó con código " + status + ". Revisa la consola.");
-                return;
+                ConsoleLogStore.warn("Instalador oficial terminó con código " + status + "; comprobando antes del fallback.");
             }
             waitForSteamAfterInstall(0);
+            return;
+        }
+
+        if ("steam_fallback".equals(purpose)) {
+            installerStarted = false;
+            if (status != 0) {
+                ConsoleLogStore.warn("Fallback Winlator terminó con código " + status + "; buscando steam.exe de todos modos.");
+            }
+            waitForSteamAfterFallback(0);
             return;
         }
 
@@ -474,27 +484,28 @@ public final class ConsoleBootstrapController {
         File steam = findSteamExecutable(steamContainer);
         if (steam != null) {
             installerStarted = false;
-            update("steam", "Steam", "Instalación completada", BootstrapStep.State.DONE, 100);
             ConsoleLogStore.ok("steam.exe encontrado: " + steam.getAbsolutePath());
-            listener.onReady(true);
-            pendingAutoLaunch = false;
-            update("launch", "Inicio", "Todo listo · inicia Steam cuando quieras", BootstrapStep.State.WAITING, 0);
+            markSteamReady(steam);
             return;
         }
 
         if (attempt >= 120) {
             installerStarted = false;
-            pendingAutoLaunch = false;
             File deep = findSteamExecutableDeep(steamContainer);
             if (deep != null) {
                 ConsoleLogStore.ok("steam.exe localizado por búsqueda profunda: " + deep.getAbsolutePath());
-                update("steam", "Steam", "Instalación completada", BootstrapStep.State.DONE, 100);
-                update("launch", "Inicio", "Todo listo · inicia Steam cuando quieras", BootstrapStep.State.WAITING, 0);
-                listener.onReady(true);
+                markSteamReady(deep);
                 return;
             }
+
             logSteamDirectoryState();
-            fail("steam", "SteamSetup terminó, pero steam.exe no apareció después de 60 s");
+            if (!steamFallbackStarted) {
+                startWinlatorSteamFallback();
+            }
+            else {
+                pendingAutoLaunch = false;
+                fail("steam", "Los dos métodos de instalación terminaron sin producir steam.exe");
+            }
             return;
         }
 
@@ -507,6 +518,83 @@ public final class ConsoleBootstrapController {
             ConsoleLogStore.info("Verificando steam.exe… " + seconds + " s / 60 s");
         }
         main.postDelayed(() -> waitForSteamAfterInstall(attempt + 1), 500);
+    }
+
+    private void startWinlatorSteamFallback() {
+        steamFallbackStarted = true;
+        installerStarted = true;
+
+        RootFS root = RootFS.find(activity);
+        File source = new File(root.getRootDir(), "opt/apps/winaddons.exe");
+        if (!source.isFile()) {
+            installerStarted = false;
+            fail("steam", "Fallback no disponible: falta Z:\\opt\\apps\\winaddons.exe");
+            return;
+        }
+
+        File dir = new File(steamContainer.getRootDir(), ".wine/drive_c/DroidDeck");
+        if (!dir.isDirectory() && !dir.mkdirs()) {
+            installerStarted = false;
+            fail("steam", "No se pudo preparar C:\\DroidDeck para el fallback");
+            return;
+        }
+
+        File fallback = new File(dir, "WinAddons.exe");
+        if (!fallback.isFile() || fallback.length() != source.length()) {
+            if (!FileUtils.copy(source, fallback)) {
+                installerStarted = false;
+                fail("steam", "No se pudo copiar el instalador compatible de Winlator");
+                return;
+            }
+        }
+
+        update("steam", "Steam", "Método 2/2 · instalador compatible de Winlator", BootstrapStep.State.RUNNING, 98);
+        ConsoleLogStore.warn("SteamSetup oficial no produjo steam.exe; activando fallback compatible de Winlator.");
+        ConsoleLogStore.info("Fallback: WinAddons.exe -n \"Steam (Legacy)\" -d \"Steam\" -e \"steam.exe\"");
+        launchWindowsExecutable(
+                fallback,
+                "-n \"Steam (Legacy)\" -d \"Steam\" -e \"steam.exe\"",
+                "steam_fallback"
+        );
+    }
+
+    private void waitForSteamAfterFallback(int attempt) {
+        File steam = findSteamExecutableDeep(steamContainer);
+        if (steam != null) {
+            installerStarted = false;
+            ConsoleLogStore.ok("steam.exe encontrado por fallback: " + steam.getAbsolutePath());
+            markSteamReady(steam);
+            return;
+        }
+
+        if (attempt >= 180) {
+            installerStarted = false;
+            pendingAutoLaunch = false;
+            logSteamDirectoryState();
+            fail("steam", "Fallback de Winlator terminó, pero steam.exe tampoco apareció");
+            return;
+        }
+
+        int seconds = attempt / 2;
+        update(
+                "steam",
+                "Steam",
+                "Método 2/2 trabajando · " + seconds + " s · buscando steam.exe",
+                BootstrapStep.State.RUNNING,
+                Math.min(99, 98 + attempt / 120)
+        );
+        if (attempt % 10 == 0) {
+            ConsoleLogStore.info("Fallback Winlator · verificando steam.exe · " + seconds + " s");
+        }
+        main.postDelayed(() -> waitForSteamAfterFallback(attempt + 1), 500L);
+    }
+
+    private void markSteamReady(File steam) {
+        update("steam", "Steam", "Instalación completada", BootstrapStep.State.DONE, 100);
+        ConsoleLogStore.ok("Steam listo: " + steam.getAbsolutePath());
+        listener.onReady(true);
+        pendingAutoLaunch = false;
+        update("launch", "Inicio", "Todo listo · inicia Steam cuando quieras", BootstrapStep.State.WAITING, 0);
     }
 
     private void logSteamDirectoryState() {
