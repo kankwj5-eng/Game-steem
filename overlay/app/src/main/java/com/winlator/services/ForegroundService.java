@@ -185,7 +185,9 @@ public class ForegroundService extends Service {
             };
 
     private static boolean hasReason() {
-        return sessionActive.get();
+        // SteamLegacyInstaller runs before a Wine/XServer session exists.
+        // installerActive must therefore keep the foreground service alive by itself.
+        return sessionActive.get() || installerActive.get();
     }
 
     private static synchronized void updateForegroundState(Context ctx) {
