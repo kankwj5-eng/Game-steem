@@ -486,21 +486,21 @@ public final class ConsoleBootstrapController {
             return;
         }
 
-        if (attempt >= 30) {
+        if (attempt >= 120) {
             installerStarted = false;
             pendingAutoLaunch = false;
             logSteamDirectoryState();
-            fail("steam", "SteamSetup terminó, pero steam.exe no apareció después de 15 s");
+            fail("steam", "SteamSetup terminó, pero steam.exe no apareció después de 60 s");
             return;
         }
 
         int seconds = attempt / 2;
-        int progress = Math.min(99, 96 + (attempt / 10));
+        int progress = Math.min(99, 97 + (attempt / 60));
         update("steam", "Steam",
                 "Finalizando instalación… " + seconds + " s · buscando steam.exe",
                 BootstrapStep.State.RUNNING, progress);
         if (attempt % 4 == 0) {
-            ConsoleLogStore.info("Verificando steam.exe… intento " + (attempt + 1) + "/31");
+            ConsoleLogStore.info("Verificando steam.exe… " + seconds + " s / 60 s");
         }
         main.postDelayed(() -> waitForSteamAfterInstall(attempt + 1), 500);
     }
