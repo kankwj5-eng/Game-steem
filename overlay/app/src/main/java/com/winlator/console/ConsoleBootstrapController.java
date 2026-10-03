@@ -326,7 +326,7 @@ public final class ConsoleBootstrapController {
         connection.setConnectTimeout(15_000);
         connection.setReadTimeout(60_000);
         connection.setInstanceFollowRedirects(true);
-        connection.setRequestProperty("User-Agent", "DroidDeck/0.7 Android");
+        connection.setRequestProperty("User-Agent", "DroidDeck/0.8 Android");
         if (existing > 0) connection.setRequestProperty("Range", "bytes=" + existing + "-");
         connection.connect();
 
