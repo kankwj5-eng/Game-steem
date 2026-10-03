@@ -38,7 +38,7 @@ public final class ConsoleBootstrapController {
 
     private static final String CONTAINER_MARKER = "droiddeckSteam";
     private static final String CONTAINER_NAME = "DroidDeck Steam";
-    private static final long MIN_FREE_BYTES = 1024L * 1024L * 1024L;
+    private static final long MIN_FREE_BYTES = 1400L * 1024L * 1024L;
 
     private final AppCompatActivity activity;
     private final Listener listener;
@@ -100,7 +100,7 @@ public final class ConsoleBootstrapController {
                 .putBoolean("enable_background_wakelock", true)
                 .apply();
 
-        ConsoleLogStore.info("BOOT · DroidDeck M14 · Winlator 11.2 · instalación Steam Legacy nativa Android");
+        ConsoleLogStore.info("BOOT · DroidDeck M15 · Winlator 11.2 · instalación Steam Legacy nativa Android");
         update("system", "Sistema", "Verificando RootFS de Winlator 11.2", BootstrapStep.State.RUNNING, 5);
 
         RootFS root = RootFS.find(activity);
@@ -327,7 +327,7 @@ public final class ConsoleBootstrapController {
             return;
         }
         if (!hasEnoughSpace()) {
-            fail("steam", "Se necesita al menos 1 GB libre para preparar Steam");
+            fail("steam", "Se necesitan al menos 1.4 GB libres para Steam Legacy (descarga + extracción + margen)");
             return;
         }
 
