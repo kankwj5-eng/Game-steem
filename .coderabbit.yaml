@@ -1,0 +1,45 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: "es-ES"
+early_access: false
+enable_free_tier: true
+
+tone_instructions: >-
+  Sé directo, técnico y verificable. Prioriza defectos reales, vulnerabilidades,
+  regresiones y riesgos de seguridad sobre observaciones de estilo.
+
+reviews:
+  profile: "assertive"
+  high_level_summary: true
+  high_level_summary_instructions: >-
+    Resume a alto nivel qué cambia el PR, qué comportamiento afecta, qué riesgos
+    de seguridad o compatibilidad introduce y qué validaciones deberían ejecutar
+    los mantenedores antes de fusionarlo.
+  review_status: true
+  poem: false
+
+  path_instructions:
+    - path: "{**/*,**/.*,**/.*/**}"
+      instructions: |-
+        Actúa como tester de seguridad del proyecto DroidDeck.
+
+        Busca vulnerabilidades, secretos expuestos, validaciones insuficientes,
+        inyección de comandos o rutas, uso inseguro de archivos y permisos,
+        problemas de autenticación o autorización, errores de concurrencia,
+        corrupción o pérdida de datos, memory-safety en C/C++, dependencias
+        vulnerables y configuraciones de CI inseguras.
+
+        Para cada vulnerabilidad encontrada:
+        1. Explica claramente el problema y el escenario de explotación o fallo.
+        2. Indica el archivo y la parte afectada.
+        3. Explica el impacto y la severidad de forma razonada.
+        4. Recomienda una corrección concreta y, cuando sea útil, una prueba de regresión.
+        5. Distingue hechos observados de riesgos que todavía requieren verificación.
+
+        Evita falsos positivos, observaciones puramente estéticas y recomendaciones
+        genéricas que no estén sustentadas por el diff o el código relacionado.
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
