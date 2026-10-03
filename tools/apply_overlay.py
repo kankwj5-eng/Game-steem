@@ -68,7 +68,7 @@ manifest.write_text(text, encoding="utf-8")
 
 btext = build_gradle.read_text(encoding="utf-8")
 btext = btext.replace("applicationId 'com.winlator'", "applicationId 'com.droiddeck.console'")
-btext = btext.replace('versionName "11.2"', 'versionName "0.5.0-m5"')
+btext = btext.replace('versionName "11.2"', 'versionName "0.6.0-m6"')
 build_gradle.write_text(btext, encoding="utf-8")
 
 for strings in (src / "app/src/main/res").glob("values*/strings.xml"):
@@ -141,12 +141,12 @@ xtext = xserver.read_text(encoding="utf-8")
 if "import com.winlator.console.ConsoleLogStore;" not in xtext:
     xtext = xtext.replace(
         "import com.winlator.contentdialog.WineD3DConfigDialog;",
-        "import com.winlator.contentdialog.WineD3DConfigDialog;\nimport com.winlator.console.ConsoleLogStore;\nimport com.winlator.console.RuntimeConsoleOverlay;"
+        "import com.winlator.contentdialog.WineD3DConfigDialog;\nimport com.winlator.console.ConsoleLogStore;\nimport com.winlator.console.RuntimeConsoleOverlay;\nimport com.winlator.console.SteamRuntimeWatchdog;"
     )
 if "private boolean droidDeckConsoleMode;" not in xtext:
     xtext = xtext.replace(
         "private String screenEffectProfile;",
-        "private String screenEffectProfile;\n    private boolean droidDeckConsoleMode;\n    private RuntimeConsoleOverlay droidDeckRuntimeOverlay;"
+        "private String screenEffectProfile;\n    private boolean droidDeckConsoleMode;\n    private RuntimeConsoleOverlay droidDeckRuntimeOverlay;\n    private SteamRuntimeWatchdog droidDeckSteamWatchdog;"
     )
 if 'droidDeckConsoleMode = getIntent().getBooleanExtra("droiddeck_console", false);' not in xtext:
     xtext = xtext.replace(
@@ -252,6 +252,10 @@ xtext = xtext.replace(
     "                    if (droidDeckConsoleMode && droidDeckRuntimeOverlay != null) {\n"
     "                        String runtimePurpose = getIntent().getStringExtra(\"droiddeck_purpose\");\n"
     "                        if (\"steam_client\".equals(runtimePurpose)) {\n"
+    "                            if (droidDeckSteamWatchdog != null) {\n"
+    "                                droidDeckSteamWatchdog.stop();\n"
+    "                                droidDeckSteamWatchdog = null;\n"
+    "                            }\n"
     "                            droidDeckRuntimeOverlay.ready(\"Ventana de Steam lista\");\n"
     "                        }\n"
     "                        else {\n"
@@ -312,7 +316,11 @@ xtext = xtext.replace(
     "        if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\"Box64 + Wine\", \"Iniciando servicios y proceso Windows\", 92);\n"
     "        environment.startEnvironmentComponents();\n\n"
     "        winHandler.start();\n"
-    "        if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\"Steam\", \"Esperando la primera ventana real\", 95);"
+    "        if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\"Steam\", \"Esperando la primera ventana real\", 95);\n"
+    "        if (droidDeckConsoleMode && droidDeckRuntimeOverlay != null && \"steam_client\".equals(getIntent().getStringExtra(\"droiddeck_purpose\"))) {\n"
+    "            droidDeckSteamWatchdog = new SteamRuntimeWatchdog(this, droidDeckRuntimeOverlay);\n"
+    "            droidDeckSteamWatchdog.start();\n"
+    "        }"
 )
 
 xtext = xtext.replace(
@@ -341,6 +349,10 @@ xtext = xtext.replace(
     "    protected void onDestroy() {\n"
     "        winHandler.stop();",
     "    protected void onDestroy() {\n"
+    "        if (droidDeckSteamWatchdog != null) {\n"
+    "            droidDeckSteamWatchdog.stop();\n"
+    "            droidDeckSteamWatchdog = null;\n"
+    "        }\n"
     "        if (droidDeckRuntimeOverlay != null) {\n"
     "            droidDeckRuntimeOverlay.close();\n"
     "            droidDeckRuntimeOverlay = null;\n"
@@ -352,6 +364,10 @@ xtext = xtext.replace(
     "                    ConsoleLogStore.append(\"RUNTIME\", \"Proceso finalizado con código \" + status);\n"
     "                    Intent result = new Intent();",
     "                    ConsoleLogStore.append(\"RUNTIME\", \"Proceso finalizado con código \" + status);\n"
+    "                    if (droidDeckSteamWatchdog != null) {\n"
+    "                        droidDeckSteamWatchdog.stop();\n"
+    "                        droidDeckSteamWatchdog = null;\n"
+    "                    }\n"
     "                    if (droidDeckRuntimeOverlay != null) {\n"
     "                        droidDeckRuntimeOverlay.close();\n"
     "                        droidDeckRuntimeOverlay = null;\n"
@@ -366,6 +382,7 @@ for token in [
     'droidDeckRuntimeOverlay.stage("Audio"',
     'droidDeckRuntimeOverlay.stage("Box64 + Wine"',
     'droidDeckRuntimeOverlay.ready("Ventana de Steam lista")',
+    'droidDeckSteamWatchdog = new SteamRuntimeWatchdog',
     'if (!droidDeckConsoleMode) environment.onPause();',
     'if (!droidDeckConsoleMode) environment.onResume();',
 ]:
@@ -386,5 +403,5 @@ nutext = nutext.replace('"Winlator Foreground Service"', '"DroidDeck en segundo 
 nutext = nutext.replace('"Allows to display Winlator foreground notifications"', '"Mantiene Steam y el motor de DroidDeck activos en segundo plano"')
 notification_utils.write_text(nutext, encoding="utf-8")
 
-print("Overlay DroidDeck M5 aplicado.")
+print("Overlay DroidDeck M6 aplicado.")
 print("Base esperada:", EXPECTED_SHA)
