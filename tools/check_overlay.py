@@ -16,6 +16,8 @@ required = [
     root / "overlay/app/src/main/res/layout/console_launcher_activity.xml",
     root / "overlay/app/src/main/res/drawable/console_status_chip.xml",
     root / "overlay/app/src/main/res/drawable/ic_droiddeck_logo.xml",
+    root / "tools/native_security_fixes.py",
+    root / "tools/cppcheck-suppressions.txt",
 ]
 for p in required:
     if not p.is_file():
@@ -57,6 +59,21 @@ for token in ["ARRANQUE", "Wine y prefijo", "Vortek / Gladio", "Box64 + Wine", "
     if token not in runtime_overlay:
         raise SystemExit(f"overlay runtime incompleto: falta {token}")
 
+security_fixes = (root / "tools/native_security_fixes.py").read_text()
+for token in [
+    "sizeof(attenuation)",
+    "full_declaration = {0}",
+    "1u << i",
+    "va_end(cp)",
+    "rect_coord_buf",
+    "localMemoryInfo",
+    "MEMFREE(waitSemaphoresRequest->inputBuffer)",
+    "appendShaderString",
+    "free(tmpDir)",
+]:
+    if token not in security_fixes:
+        raise SystemExit(f"security fixes incompletos: falta {token}")
+
 patcher = (root / "tools/apply_overlay.py").read_text()
 for token in [
     "/data/data/com.droiddeck.console/",
@@ -88,4 +105,4 @@ for token in ['@drawable/ic_droiddeck_logo', 'DROIDDECK']:
     if token not in launcher_xml or token not in runtime_xml:
         raise SystemExit(f"branding M7 incompleto: falta {token}")
 
-print("Overlay M7 válido: instalador espera hijos, watchdog vivo, Steam C:\\Steam y branding DroidDeck integrado.")
+print("Overlay M7 válido: runtime, branding y fixes nativos de seguridad integrados.")
