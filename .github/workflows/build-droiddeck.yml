@@ -112,7 +112,6 @@ jobs:
         with:
           category: "/language:java-kotlin-cpp"
 
-
   steam_contract:
     name: Steam Legacy upstream contract
     runs-on: ubuntu-latest
@@ -133,13 +132,10 @@ jobs:
           mkdir -p steam-contract
           URL='https://github.com/brunodev85/winlator-addons/releases/download/v1.0.0/steam-legacy.7z'
           echo "$URL" | tee steam-contract/source-url.txt
-
-          curl -fL             --retry 4             --retry-delay 2             --retry-all-errors             --connect-timeout 20             --max-time 900             "$URL"             -o steam-contract/steam-legacy.7z
-
+          curl -fL --retry 4 --retry-delay 2 --retry-all-errors --connect-timeout 20 --max-time 900 "$URL" -o steam-contract/steam-legacy.7z
           test -s steam-contract/steam-legacy.7z
           stat -c '%s' steam-contract/steam-legacy.7z | tee steam-contract/size-bytes.txt
           sha256sum steam-contract/steam-legacy.7z | tee steam-contract/SHA256SUMS.txt
-
           7z l -slt steam-contract/steam-legacy.7z | tee steam-contract/listing.txt
           grep -Eiq 'Path = Steam[/\\]steam\.exe    runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -594,10 +590,7 @@ jobs:
           fi
 
  steam-contract/listing.txt
-
-          echo "Verified Steam/steam.exe inside upstream asset." | tee steam-contract/result.txt
-
-          # Do not upload Valve/Steam payload; retain only metadata.
+          echo 'Verified Steam/steam.exe inside upstream asset.' | tee steam-contract/result.txt
           rm -f steam-contract/steam-legacy.7z
 
       - name: Upload Steam contract metadata
