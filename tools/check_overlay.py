@@ -4,6 +4,7 @@ import xml.etree.ElementTree as ET
 import py_compile
 
 root = Path(__file__).resolve().parents[1]
+
 required = [
     root / "upstream.lock",
     root / "overlay/app/src/main/java/com/winlator/ConsoleLauncherActivity.java",
@@ -12,6 +13,8 @@ required = [
     root / "overlay/app/src/main/java/com/winlator/console/BootstrapStep.java",
     root / "overlay/app/src/main/java/com/winlator/console/RuntimeConsoleOverlay.java",
     root / "overlay/app/src/main/java/com/winlator/console/SteamRuntimeWatchdog.java",
+    root / "overlay/app/src/main/java/com/winlator/console/SteamLegacyInstaller.java",
+    root / "overlay/app/src/main/java/com/winlator/services/ForegroundService.java",
     root / "overlay/app/src/main/res/layout/droiddeck_runtime_overlay.xml",
     root / "overlay/app/src/main/res/layout/console_launcher_activity.xml",
     root / "overlay/app/src/main/res/drawable/console_status_chip.xml",
@@ -19,42 +22,83 @@ required = [
     root / "tools/native_security_fixes.py",
     root / "tools/cppcheck-suppressions.txt",
 ]
-for p in required:
-    if not p.is_file():
-        raise SystemExit(f"falta {p.relative_to(root)}")
+for path in required:
+    if not path.is_file():
+        raise SystemExit(f"falta {path.relative_to(root)}")
 
-for p in (root / "overlay/app/src/main/res").rglob("*.xml"):
-    ET.parse(p)
+for path in (root / "overlay/app/src/main/res").rglob("*.xml"):
+    ET.parse(path)
 
-for p in (root / "tools").glob("*.py"):
-    py_compile.compile(str(p), doraise=True)
+for path in (root / "tools").glob("*.py"):
+    py_compile.compile(str(path), doraise=True)
 
 controller = (root / "overlay/app/src/main/java/com/winlator/console/ConsoleBootstrapController.java").read_text()
-activity = (root / "overlay/app/src/main/java/com/winlator/ConsoleLauncherActivity.java").read_text()
-
 for token in [
-    "SteamSetup.exe",
-    '"/S /D=C:\\\\Steam"',
-    "Range",
-    "formatSpeed",
+    "SteamLegacyInstaller",
+    "Program Files (x86)/Steam/steam.exe",
+    "startSteam()",
     "handleRuntimeResult",
-    "WineUtils.unixToDOSPath",
-    ".wine/drive_c/DroidDeck",
-    "waitForSteamAfterInstall",
-    "Tamaño incompleto",
     "runtimeActive",
     "enable_background_protection",
     "enable_background_wakelock",
     "retry()",
-    "steam_fallback",
-    "launchWindowsDosExecutable",
-    "Z:\\\\opt\\\\apps\\\\winaddons.exe",
-    "Método 2/2",
+    "Box64",
+    "installSteamLegacy",
 ]:
     if token not in controller:
-        raise SystemExit(f"controlador incompleto: falta {token}")
+        raise SystemExit(f"controlador M10 incompleto: falta {token}")
 
-for token in ["requestRequiredPermissions", "onActivityResult", "TVCurrentPercent", "StepPermissionsStatus"]:
+# M10 must not regress to hidden Windows installers.
+for forbidden in [
+    "SteamSetup.exe",
+    "steam_install",
+    "steam_fallback",
+    "launchWindowsDosExecutable",
+    "waitForSteamAfterInstall",
+]:
+    if forbidden in controller:
+        raise SystemExit(f"controlador M10 conserva ruta antigua prohibida: {forbidden}")
+
+installer = (root / "overlay/app/src/main/java/com/winlator/console/SteamLegacyInstaller.java").read_text()
+for token in [
+    "steam-legacy.7z",
+    "winlator-addons/releases/download/v1.0.0",
+    "windows/temp",
+    "SevenZFile",
+    "Range",
+    "SHA-256",
+    "Program Files (x86)",
+    "steam/steam.exe",
+    "getCanonicalPath",
+    "EXTRACT",
+    "startInstallerSession",
+    "stopInstallerSession",
+    "EXPECTED_SHA256",
+    "FOREGROUND",
+]:
+    if token not in installer:
+        raise SystemExit(f"instalador Steam Legacy incompleto: falta {token}")
+
+foreground = (root / "overlay/app/src/main/java/com/winlator/services/ForegroundService.java").read_text()
+for token in [
+    "installerActive",
+    "startInstallerSession",
+    "stopInstallerSession",
+    "FOREGROUND_SERVICE_TYPE_DATA_SYNC",
+    "ConsoleLauncherActivity",
+    "Installer active; keeping process alive after task removal",
+]:
+    if token not in foreground:
+        raise SystemExit(f"ForegroundService M10 incompleto: falta {token}")
+
+activity = (root / "overlay/app/src/main/java/com/winlator/ConsoleLauncherActivity.java").read_text()
+for token in [
+    "requestRequiredPermissions",
+    "onActivityResult",
+    "TVCurrentPercent",
+    "StepPermissionsStatus",
+    "controller.destroy()",
+]:
     if token not in activity:
         raise SystemExit(f"launcher incompleto: falta {token}")
 
@@ -64,15 +108,21 @@ for token in [
     "ProcessHelper.getChildProcesses",
     "scanSteamFiles",
     "POSIBLE BLOQUEO REAL",
-    "steam_install",
-    "steam_fallback",
     "fileWriteRate",
 ]:
     if token not in watchdog:
-        raise SystemExit(f"watchdog M9 incompleto: falta {token}")
+        raise SystemExit(f"watchdog incompleto: falta {token}")
 
 runtime_overlay = (root / "overlay/app/src/main/java/com/winlator/console/RuntimeConsoleOverlay.java").read_text()
-for token in ["ARRANQUE", "Wine y prefijo", "Vortek / Gladio", "Box64 + Wine", "Ventana de Steam", "waitingTelemetry", "95% ·"]:
+for token in [
+    "ARRANQUE",
+    "Wine y prefijo",
+    "Vortek / Gladio",
+    "Box64 + Wine",
+    "Ventana de Steam",
+    "waitingTelemetry",
+    "95% ·",
+]:
     if token not in runtime_overlay:
         raise SystemExit(f"overlay runtime incompleto: falta {token}")
 
@@ -95,7 +145,7 @@ patcher = (root / "tools/apply_overlay.py").read_text()
 for token in [
     "/data/data/com.droiddeck.console/",
     "runOnUiThread",
-    'versionName "0.9.0-m9"',
+    'versionName "1.0.0-m10"',
     "SteamRuntimeWatchdog",
     "droidDeckSteamWatchdog = new SteamRuntimeWatchdog",
     'android:label="DroidDeck"',
@@ -106,23 +156,19 @@ for token in [
     'droidDeckRuntimeOverlay.stage("Audio"',
     'droidDeckRuntimeOverlay.stage("Box64 + Wine"',
     'droidDeckRuntimeOverlay.ready("Ventana de Steam lista")',
-    "DroidDeck:ForegroundService",
-    "waitForDroidDeckSteamInstaller",
-    "findDroidDeckSteamExecutable",
-    "finishDroidDeckRuntime",
-    "exec_dos_path",
     "COMANDO EFECTIVO",
-    "steam_fallback",
-    "120000L",
-    "steam.exe no apareció tras 120 s",
+    "FOREGROUND_SERVICE_DATA_SYNC",
+    'android:foregroundServiceType="mediaPlayback|dataSync"',
+    "commons-compress:1.28.0",
+    "xz:1.12",
 ]:
     if token not in patcher:
-        raise SystemExit(f"parche M9 incompleto: falta {token}")
+        raise SystemExit(f"parche M10 incompleto: falta {token}")
 
 launcher_xml = (root / "overlay/app/src/main/res/layout/console_launcher_activity.xml").read_text()
 runtime_xml = (root / "overlay/app/src/main/res/layout/droiddeck_runtime_overlay.xml").read_text()
 for token in ['@drawable/ic_droiddeck_logo', 'DROIDDECK']:
     if token not in launcher_xml or token not in runtime_xml:
-        raise SystemExit(f"branding M9 incompleto: falta {token}")
+        raise SystemExit(f"branding M10 incompleto: falta {token}")
 
-print("Overlay M9 válido: telemetría viva, fallback Steam y comando efectivo integrados.")
+print("Overlay M10 válido: instalación Steam Legacy nativa, telemetría y seguridad integradas.")
