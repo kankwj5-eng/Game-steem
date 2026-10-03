@@ -47,7 +47,7 @@ jobs:
       - name: Validate DroidDeck overlay
         run: python3 tools/check_overlay.py
 
-      - name: Apply DroidDeck M12 overlay
+      - name: Apply DroidDeck M13 overlay
         run: python3 tools/apply_overlay.py "$GITHUB_WORKSPACE/winlator-app"
 
       - name: Verify critical wiring
@@ -85,6 +85,34 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon --stacktrace :app:assembleDebug
 
+      - name: Re-sign APK with stable AOSP development key
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=winlator-app/app/build/outputs/apk/debug/app-debug.apk
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/35.0.0"
+          KEY_DIR="$RUNNER_TEMP/droiddeck-signing"
+          KEY_COMMIT='045a3d6a3e359633a14853a5a5e1e4f2a11cbdae'
+          CERT_SHA256='a40da80a59d170caa950cf15c18c454d47a39b26989d8b640ecd745ba71bf5dc'
+
+          mkdir -p "$KEY_DIR"
+          curl -fsSL --retry 4 --retry-delay 2 \
+            "https://raw.githubusercontent.com/aosp-mirror/platform_build/$KEY_COMMIT/target/product/security/testkey.pk8" \
+            -o "$KEY_DIR/testkey.pk8"
+          curl -fsSL --retry 4 --retry-delay 2 \
+            "https://raw.githubusercontent.com/aosp-mirror/platform_build/$KEY_COMMIT/target/product/security/testkey.x509.pem" \
+            -o "$KEY_DIR/testkey.x509.pem"
+
+          "$BUILD_TOOLS/zipalign" -f -p 4 "$APK" "$KEY_DIR/aligned.apk"
+          "$BUILD_TOOLS/apksigner" sign \
+            --key "$KEY_DIR/testkey.pk8" \
+            --cert "$KEY_DIR/testkey.x509.pem" \
+            --out "$KEY_DIR/signed.apk" \
+            "$KEY_DIR/aligned.apk"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$KEY_DIR/signed.apk" | tee apk-signing.txt
+          grep -Fq "Signer #1 certificate SHA-256 digest: $CERT_SHA256" apk-signing.txt
+          cp "$KEY_DIR/signed.apk" "$APK"
+
       - name: Inspect APK
         run: |
           APK=winlator-app/app/build/outputs/apk/debug/app-debug.apk
@@ -95,14 +123,15 @@ jobs:
       - name: Package APK
         run: |
           mkdir -p out
-          cp winlator-app/app/build/outputs/apk/debug/app-debug.apk out/Game-steem-DroidDeck-M12-debug.apk
+          cp winlator-app/app/build/outputs/apk/debug/app-debug.apk out/Game-steem-DroidDeck-M13-debug.apk
           cp apk-badging.txt out/apk-badging.txt
-          sha256sum out/Game-steem-DroidDeck-M12-debug.apk | tee out/SHA256SUMS.txt
+          cp apk-signing.txt out/apk-signing.txt
+          sha256sum out/Game-steem-DroidDeck-M13-debug.apk | tee out/SHA256SUMS.txt
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Game-steem-DroidDeck-M12
+          name: Game-steem-DroidDeck-M13
           path: out/*
           if-no-files-found: error
           retention-days: 90
