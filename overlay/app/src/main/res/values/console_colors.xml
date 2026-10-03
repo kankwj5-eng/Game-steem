@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="console_bg">#050711</color>
+    <color name="console_bg_2">#0A1020</color>
+    <color name="console_surface">#D9101628</color>
+    <color name="console_surface_alt">#E0172036</color>
+    <color name="console_text">#F8FAFF</color>
+    <color name="console_muted">#98A5C7</color>
+    <color name="console_accent">#6B78FF</color>
+    <color name="console_accent_2">#986CFF</color>
+    <color name="console_accent_soft">#386B78FF</color>
+    <color name="console_ok">#46D7A2</color>
+    <color name="console_warn">#FFBF69</color>
+    <color name="console_error">#FF667C</color>
+</resources>
