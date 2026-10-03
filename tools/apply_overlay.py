@@ -75,7 +75,7 @@ manifest.write_text(text, encoding="utf-8")
 
 btext = build_gradle.read_text(encoding="utf-8")
 btext = btext.replace("applicationId 'com.winlator'", "applicationId 'com.droiddeck.console'")
-btext = btext.replace('versionName "11.2"', 'versionName "0.8.0-m8"')
+btext = btext.replace('versionName "11.2"', 'versionName "0.9.0-m9"')
 build_gradle.write_text(btext, encoding="utf-8")
 
 for strings in (src / "app/src/main/res").glob("values*/strings.xml"):
@@ -203,7 +203,7 @@ if 'droiddeck_runtime_exit_status' not in xtext:
         '                    if (isFinishing() || isDestroyed()) return;\n'
         '                    String purpose = getIntent().getStringExtra("droiddeck_purpose");\n'
         '                    ConsoleLogStore.append("RUNTIME", "Proceso principal finalizado con código " + status + " · " + purpose);\n'
-        '                    if ("steam_install".equals(purpose)) {\n'
+        '                    if ("steam_install".equals(purpose) || "steam_fallback".equals(purpose)) {\n'
         '                        waitForDroidDeckSteamInstaller(status, android.os.SystemClock.elapsedRealtime());\n'
         '                    }\n'
         '                    else finishDroidDeckRuntime(status);\n'
@@ -442,7 +442,7 @@ xtext = xtext.replace(
     "        if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\"Steam\", \"Esperando la primera ventana real\", 95);\n"
     "        if (droidDeckConsoleMode && droidDeckRuntimeOverlay != null) {\n"
     "            String runtimePurpose = getIntent().getStringExtra(\"droiddeck_purpose\");\n"
-    "            if (\"steam_client\".equals(runtimePurpose) || \"steam_install\".equals(runtimePurpose)) {\n"
+    "            if (\"steam_client\".equals(runtimePurpose) || \"steam_install\".equals(runtimePurpose) || \"steam_fallback\".equals(runtimePurpose)) {\n"
     "                droidDeckSteamWatchdog = new SteamRuntimeWatchdog(this, droidDeckRuntimeOverlay, runtimePurpose);\n"
     "                droidDeckSteamWatchdog.start();\n"
     "            }\n"
@@ -532,5 +532,5 @@ notification_utils.write_text(nutext, encoding="utf-8")
 
 apply_native_security_fixes(src)
 
-print("Overlay DroidDeck M8 aplicado.")
+print("Overlay DroidDeck M9 aplicado.")
 print("Base esperada:", EXPECTED_SHA)
