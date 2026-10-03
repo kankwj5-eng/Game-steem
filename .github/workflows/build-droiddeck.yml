@@ -9,6 +9,7 @@ permissions:
   contents: read
   security-events: write
   actions: read
+  issues: write
 
 jobs:
   build:
@@ -104,3 +105,449 @@ jobs:
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:java-kotlin-cpp"
+
+  semgrep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout Game-steem
+        uses: actions/checkout@v7
+
+      - name: Prepare effective DroidDeck source
+        run: bash tools/prepare_effective_source.sh
+
+      - name: Install Semgrep OSS
+        run: python3 -m pip install --disable-pip-version-check "semgrep==1.179.0"
+
+      - name: Run Semgrep security-audit
+        id: scan
+        shell: bash
+        run: |
+          mkdir -p results
+          set +e
+          semgrep scan \
+            --config p/security-audit \
+            --metrics=off \
+            --sarif \
+            --output results/raw-semgrep.sarif \
+            winlator-app/app/src/main/java \
+            winlator-app/app/src/main/cpp \
+            tools
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          python3 tools/ci_security_report.py \
+            --tool semgrep \
+            --format sarif \
+            --input results/raw-semgrep.sarif \
+            --out-dir results \
+            --exit-code "$code"
+
+      - name: Upload Semgrep SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results/semgrep.sarif
+          category: semgrep-security-audit
+
+      - name: Upload Semgrep results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-semgrep
+          path: results/*
+          if-no-files-found: warn
+          retention-days: 30
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout full Git history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install Gitleaks OSS binary
+        run: |
+          curl -fsSL \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            -o "$RUNNER_TEMP/gitleaks.tar.gz"
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" version
+
+      - name: Scan repository history for secrets
+        id: scan
+        shell: bash
+        run: |
+          mkdir -p results
+          set +e
+          "$RUNNER_TEMP/gitleaks" git \
+            --redact=100 \
+            --report-format sarif \
+            --report-path results/raw-gitleaks.sarif \
+            --exit-code 0 \
+            .
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          python3 tools/ci_security_report.py \
+            --tool gitleaks \
+            --format sarif \
+            --input results/raw-gitleaks.sarif \
+            --out-dir results \
+            --exit-code "$code"
+
+      - name: Upload Gitleaks SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results/gitleaks.sarif
+          category: gitleaks
+
+      - name: Upload Gitleaks results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-gitleaks
+          path: results/*
+          if-no-files-found: warn
+          retention-days: 30
+
+  trivy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout Game-steem
+        uses: actions/checkout@v7
+
+      - name: Prepare effective DroidDeck source
+        run: bash tools/prepare_effective_source.sh
+
+      - name: Install Trivy OSS binary
+        run: |
+          curl -fsSL \
+            https://github.com/aquasecurity/trivy/releases/download/v0.75.0/trivy_0.75.0_Linux-64bit.tar.gz \
+            -o "$RUNNER_TEMP/trivy.tar.gz"
+          tar -xzf "$RUNNER_TEMP/trivy.tar.gz" -C "$RUNNER_TEMP" trivy
+          "$RUNNER_TEMP/trivy" version
+
+      - name: Scan filesystem dependencies
+        id: scan
+        shell: bash
+        run: |
+          mkdir -p results
+          set +e
+          "$RUNNER_TEMP/trivy" fs \
+            --scanners vuln \
+            --format json \
+            --output results/raw-trivy.json \
+            --exit-code 0 \
+            winlator-app
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          python3 tools/ci_security_report.py \
+            --tool trivy \
+            --format trivy \
+            --input results/raw-trivy.json \
+            --out-dir results \
+            --exit-code "$code"
+
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results/trivy.sarif
+          category: trivy-filesystem
+
+      - name: Upload Trivy results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-trivy
+          path: results/*
+          if-no-files-found: warn
+          retention-days: 30
+
+  detekt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout Game-steem
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Prepare effective DroidDeck source
+        run: bash tools/prepare_effective_source.sh
+
+      - name: Install detekt OSS CLI
+        run: |
+          curl -fsSL \
+            https://github.com/detekt/detekt/releases/download/v1.23.8/detekt-cli-1.23.8.zip \
+            -o "$RUNNER_TEMP/detekt.zip"
+          unzip -q "$RUNNER_TEMP/detekt.zip" -d "$RUNNER_TEMP"
+          "$RUNNER_TEMP/detekt-cli-1.23.8/bin/detekt-cli" --version
+
+      - name: Run detekt
+        id: scan
+        shell: bash
+        run: |
+          mkdir -p results
+          code=0
+          if find winlator-app -type f -name '*.kt' -print -quit | grep -q .; then
+            set +e
+            "$RUNNER_TEMP/detekt-cli-1.23.8/bin/detekt-cli" \
+              --input winlator-app \
+              --build-upon-default-config \
+              --report sarif:results/raw-detekt.sarif
+            code=$?
+            set -e
+          fi
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          python3 tools/ci_security_report.py \
+            --tool detekt \
+            --format sarif \
+            --input results/raw-detekt.sarif \
+            --out-dir results \
+            --exit-code "$code"
+
+      - name: Upload detekt SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results/detekt.sarif
+          category: detekt-kotlin
+
+      - name: Upload detekt results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-detekt
+          path: results/*
+          if-no-files-found: warn
+          retention-days: 30
+
+  cppcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout Game-steem
+        uses: actions/checkout@v7
+
+      - name: Prepare effective DroidDeck source
+        run: bash tools/prepare_effective_source.sh
+
+      - name: Install cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+          cppcheck --version
+
+      - name: Run cppcheck
+        id: scan
+        shell: bash
+        run: |
+          mkdir -p results
+          set +e
+          cppcheck \
+            --enable=warning,performance,portability \
+            --inconclusive \
+            --std=c++17 \
+            --suppress=missingIncludeSystem \
+            --xml \
+            --xml-version=2 \
+            -j 2 \
+            winlator-app/app/src/main/cpp \
+            2> results/raw-cppcheck.xml
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          python3 tools/ci_security_report.py \
+            --tool cppcheck \
+            --format cppcheck \
+            --input results/raw-cppcheck.xml \
+            --out-dir results \
+            --exit-code "$code"
+
+      - name: Upload cppcheck SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results/cppcheck.sarif
+          category: cppcheck-cpp
+
+      - name: Upload cppcheck results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-cppcheck
+          path: results/*
+          if-no-files-found: warn
+          retention-days: 30
+
+  ruff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Game-steem
+        uses: actions/checkout@v7
+
+      - name: Install Ruff OSS
+        run: python3 -m pip install --disable-pip-version-check "ruff==0.16.10"
+
+      - name: Run Ruff
+        id: scan
+        shell: bash
+        run: |
+          mkdir -p results
+          set +e
+          ruff check tools \
+            --output-format json \
+            --output-file results/raw-ruff.json \
+            --exit-zero
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          python3 tools/ci_security_report.py \
+            --tool ruff \
+            --format ruff \
+            --input results/raw-ruff.json \
+            --out-dir results \
+            --exit-code "$code"
+
+      - name: Upload Ruff SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results/ruff.sarif
+          category: ruff-python
+
+      - name: Upload Ruff results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-ruff
+          path: results/*
+          if-no-files-found: warn
+          retention-days: 30
+
+  security_summary:
+    name: Security summary and issue
+    if: always()
+    needs:
+      - build
+      - semgrep
+      - gitleaks
+      - trivy
+      - detekt
+      - cppcheck
+      - ruff
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download scanner results
+        uses: actions/download-artifact@v5
+        continue-on-error: true
+        with:
+          pattern: security-*
+          path: security-results
+          merge-multiple: true
+
+      - name: Build GITHUB_STEP_SUMMARY
+        shell: bash
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          SEMGREP_RESULT: ${{ needs.semgrep.result }}
+          GITLEAKS_RESULT: ${{ needs.gitleaks.result }}
+          TRIVY_RESULT: ${{ needs.trivy.result }}
+          DETEKT_RESULT: ${{ needs.detekt.result }}
+          CPPCHECK_RESULT: ${{ needs.cppcheck.result }}
+          RUFF_RESULT: ${{ needs.ruff.result }}
+        run: |
+          mkdir -p security-results
+          {
+            echo "# Informe de seguridad y calidad"
+            echo
+            echo "Run: [${GITHUB_RUN_ID}](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
+            echo
+            echo "## Estado de jobs"
+            echo
+            echo "| Job | Estado |"
+            echo "|---|---|"
+            echo "| build + CodeQL | $BUILD_RESULT |"
+            echo "| Semgrep | $SEMGREP_RESULT |"
+            echo "| Gitleaks | $GITLEAKS_RESULT |"
+            echo "| Trivy | $TRIVY_RESULT |"
+            echo "| detekt | $DETEKT_RESULT |"
+            echo "| cppcheck | $CPPCHECK_RESULT |"
+            echo "| Ruff | $RUFF_RESULT |"
+            echo
+            if compgen -G "security-results/*.md" > /dev/null; then
+              for report in security-results/*.md; do
+                cat "$report"
+                echo
+              done
+            else
+              echo "> No se descargaron informes de scanners. Revisa los jobs anteriores."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Detect severe findings
+        id: severe
+        shell: bash
+        run: |
+          severe=0
+          if compgen -G "security-results/*.severe" > /dev/null; then
+            if grep -q '^1$' security-results/*.severe; then
+              severe=1
+            fi
+          fi
+          echo "found=$severe" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update severe security Issue
+        if: steps.severe.outputs.found == '1'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BODY="$RUNNER_TEMP/security-issue.md"
+          {
+            echo "## Hallazgos graves detectados"
+            echo
+            echo "El CI detectó uno o más hallazgos clasificados como graves."
+            echo
+            echo "Ejecución: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            echo "Los SARIF detallados están disponibles en **Security → Code scanning**."
+            echo
+            for report in security-results/*.md; do
+              cat "$report"
+              echo
+            done
+          } > "$BODY"
+
+          # Evita crear un Issue nuevo en cada push si ya existe uno abierto.
+          existing="$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --search 'in:title "Seguridad: hallazgos graves detectados por CI"' \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" \
+              --repo "$GITHUB_REPOSITORY" \
+              --body-file "$BODY"
+          else
+            gh issue create \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Seguridad: hallazgos graves detectados por CI" \
+              --body-file "$BODY"
+          fi
+
