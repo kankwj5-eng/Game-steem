@@ -239,6 +239,18 @@ if 'intent.getStringExtra("exec_args")' not in xtext:
     xtext = xtext.replace(old_exec, new_exec)
 
 
+
+if 'COMANDO EFECTIVO:' not in xtext:
+    old_effective = r'''        return "C:\\windows\\winhandler.exe "+cmdArgs;'''
+    new_effective = r'''        String droidDeckEffectiveCommand = "C:\\windows\\winhandler.exe "+cmdArgs;
+        if (droidDeckConsoleMode) {
+            ConsoleLogStore.append("EXEC", "COMANDO EFECTIVO: " + droidDeckEffectiveCommand);
+        }
+        return droidDeckEffectiveCommand;'''
+    if old_effective not in xtext:
+        raise SystemExit("retorno de getWineStartCommand no encontrado")
+    xtext = xtext.replace(old_effective, new_effective)
+
 # Keep the Wine environment alive after SteamSetup's parent process exits.
 if 'private void waitForDroidDeckSteamInstaller' not in xtext:
     installer_anchor = "    private boolean isGenerateWineprefix() {"
