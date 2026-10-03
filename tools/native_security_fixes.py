@@ -277,7 +277,7 @@ u_bit_scan_consecutive_range(unsigned *mask, int *start, int *count)
 
     size_t currentLength = *result ? strlen(*result) : 0;
     size_t valueLength = strlen(value);
-    if (valueLength > SIZE_MAX - currentLength - 1) return false;
+    if (currentLength > ((size_t)-1) - valueLength - 1) return false;
 
     char* resized = realloc(*result, currentLength + valueLength + 1);
     if (!resized) return false;
