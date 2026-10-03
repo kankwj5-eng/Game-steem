@@ -54,6 +54,18 @@ for token in ["requestRequiredPermissions", "onActivityResult", "TVCurrentPercen
     if token not in activity:
         raise SystemExit(f"launcher incompleto: falta {token}")
 
+watchdog = (root / "overlay/app/src/main/java/com/winlator/console/SteamRuntimeWatchdog.java").read_text()
+for token in [
+    "TrafficStats",
+    "ProcessHelper.getChildProcesses",
+    "scanSteamFiles",
+    "POSIBLE BLOQUEO REAL",
+    "steam_install",
+    "fileWriteRate",
+]:
+    if token not in watchdog:
+        raise SystemExit(f"watchdog M8 incompleto: falta {token}")
+
 runtime_overlay = (root / "overlay/app/src/main/java/com/winlator/console/RuntimeConsoleOverlay.java").read_text()
 for token in ["ARRANQUE", "Wine y prefijo", "Vortek / Gladio", "Box64 + Wine", "Ventana de Steam", "waitingTelemetry", "95% ·"]:
     if token not in runtime_overlay:
@@ -78,7 +90,7 @@ patcher = (root / "tools/apply_overlay.py").read_text()
 for token in [
     "/data/data/com.droiddeck.console/",
     "runOnUiThread",
-    'versionName "0.7.0-m7"',
+    'versionName "0.8.0-m8"',
     "SteamRuntimeWatchdog",
     "droidDeckSteamWatchdog = new SteamRuntimeWatchdog",
     'android:label="DroidDeck"',
@@ -97,12 +109,12 @@ for token in [
     "steam.exe no apareció tras 120 s",
 ]:
     if token not in patcher:
-        raise SystemExit(f"parche M7 incompleto: falta {token}")
+        raise SystemExit(f"parche M8 incompleto: falta {token}")
 
 launcher_xml = (root / "overlay/app/src/main/res/layout/console_launcher_activity.xml").read_text()
 runtime_xml = (root / "overlay/app/src/main/res/layout/droiddeck_runtime_overlay.xml").read_text()
 for token in ['@drawable/ic_droiddeck_logo', 'DROIDDECK']:
     if token not in launcher_xml or token not in runtime_xml:
-        raise SystemExit(f"branding M7 incompleto: falta {token}")
+        raise SystemExit(f"branding M8 incompleto: falta {token}")
 
-print("Overlay M7 válido: runtime, branding y fixes nativos de seguridad integrados.")
+print("Overlay M8 válido: runtime, branding y fixes nativos de seguridad integrados.")
