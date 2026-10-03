@@ -6,8 +6,6 @@ import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
-import android.os.Handler;
-import android.os.Looper;
 import android.os.StatFs;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -20,23 +18,14 @@ import com.winlator.container.ContainerManager;
 import com.winlator.container.GraphicsDrivers;
 import com.winlator.core.GPUHelper;
 import com.winlator.core.WineThemeManager;
-import com.winlator.core.WineUtils;
 import com.winlator.xenvironment.RootFS;
 import com.winlator.xenvironment.RootFSInstaller;
 
 import org.json.JSONObject;
 
-import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public final class ConsoleBootstrapController {
     public static final int REQUEST_RUNTIME = 7202;
@@ -47,30 +36,27 @@ public final class ConsoleBootstrapController {
         void onDeviceInfo(String gpu, String route);
     }
 
-    private static final String STEAM_INSTALLER_URL = "https://cdn.akamai.steamstatic.com/client/installer/SteamSetup.exe";
     private static final String CONTAINER_MARKER = "droiddeckSteam";
     private static final String CONTAINER_NAME = "DroidDeck Steam";
-    private static final long MIN_INSTALLER_BYTES = 500_000L;
-    private static final long MIN_FREE_BYTES = 350L * 1024L * 1024L;
+    private static final long MIN_FREE_BYTES = 1024L * 1024L * 1024L;
 
     private final AppCompatActivity activity;
     private final Listener listener;
-    private final Handler main = new Handler(Looper.getMainLooper());
     private final Map<String, BootstrapStep> steps = new LinkedHashMap<>();
-    private final ExecutorService io = Executors.newSingleThreadExecutor();
+
+    private final SteamLegacyInstaller.Listener installerListener = this::onInstallerState;
+
     private Container steamContainer;
     private boolean prepared;
     private boolean preparing;
-    private boolean downloadRunning;
-    private boolean installerStarted;
-    private boolean pendingAutoLaunch;
     private boolean runtimeActive;
-    private boolean steamFallbackStarted;
+    private boolean installRequested;
 
     public ConsoleBootstrapController(AppCompatActivity activity, Listener listener) {
         this.activity = activity;
         this.listener = listener;
         setDefaults();
+        SteamLegacyInstaller.addListener(installerListener);
     }
 
     private void setDefaults() {
@@ -82,10 +68,18 @@ public final class ConsoleBootstrapController {
         update("launch", "Inicio", "Esperando", BootstrapStep.State.WAITING, 0);
     }
 
+    public void destroy() {
+        SteamLegacyInstaller.removeListener(installerListener);
+    }
+
     public void setPermissionsReady(boolean granted, String detail) {
-        update("permissions", "Permisos", detail,
+        update(
+                "permissions",
+                "Permisos",
+                detail,
                 granted ? BootstrapStep.State.DONE : BootstrapStep.State.ERROR,
-                granted ? 100 : 0);
+                granted ? 100 : 0
+        );
         if (granted) ConsoleLogStore.ok("Permisos de almacenamiento listos.");
         else ConsoleLogStore.error("Permisos: " + detail);
     }
@@ -106,7 +100,9 @@ public final class ConsoleBootstrapController {
                 .putBoolean("enable_background_wakelock", true)
                 .apply();
 
-        update("system", "Sistema", "Verificando RootFS", BootstrapStep.State.RUNNING, 5);
+        ConsoleLogStore.info("BOOT · DroidDeck M10 · Winlator 11.2 · instalación Steam Legacy nativa Android");
+        update("system", "Sistema", "Verificando RootFS de Winlator 11.2", BootstrapStep.State.RUNNING, 5);
+
         RootFS root = RootFS.find(activity);
         if (root.isValid() && root.getVersion() >= RootFSInstaller.LATEST_VERSION) {
             doneSystem();
@@ -114,11 +110,18 @@ public final class ConsoleBootstrapController {
             return;
         }
 
-        ConsoleLogStore.info("RootFS ausente o desactualizado; iniciando instalación interna.");
+        ConsoleLogStore.info("ROOTFS · ausente o desactualizado; instalando recursos internos.");
         RootFSInstaller.install(activity, new RootFSInstaller.InstallProgressListener() {
             @Override
             public void onProgress(int progress) {
-                update("system", "Sistema", "Instalando archivos del motor…", BootstrapStep.State.RUNNING, progress);
+                update(
+                        "system",
+                        "Sistema",
+                        "Instalando RootFS · " + progress + "%",
+                        BootstrapStep.State.RUNNING,
+                        progress
+                );
+                if (progress % 10 == 0) ConsoleLogStore.info("ROOTFS · " + progress + "%");
             }
 
             @Override
@@ -135,54 +138,106 @@ public final class ConsoleBootstrapController {
     }
 
     public void refreshAfterResume() {
-        if (!prepared || runtimeActive) return;
-        RootFS root = RootFS.find(activity);
-        if (!root.isValid() || root.getVersion() < RootFSInstaller.LATEST_VERSION) return;
-        if (steamContainer == null) return;
+        if (!prepared || runtimeActive || steamContainer == null) return;
 
         File steam = findSteamExecutable(steamContainer);
         if (steam != null) {
-            update("steam", "Steam", "Cliente instalado", BootstrapStep.State.DONE, 100);
-            listener.onReady(true);
-            pendingAutoLaunch = false;
-            installerStarted = false;
+            markSteamReady(steam);
+            return;
         }
-        else if (installerStarted) {
-            installerStarted = false;
-            ConsoleLogStore.warn("El runtime volvió sin steam.exe; continuando con la estrategia automática.");
-            if (!steamFallbackStarted) {
-                startWinlatorSteamFallback();
-            }
-            else {
-                pendingAutoLaunch = false;
-                fail("steam", "Los dos métodos de instalación terminaron sin producir steam.exe");
-            }
+
+        SteamLegacyInstaller.State state = SteamLegacyInstaller.getState();
+        if (SteamLegacyInstaller.isRunning()) {
+            onInstallerState(state);
+        }
+        else if (state.phase == SteamLegacyInstaller.Phase.ERROR) {
+            fail("steam", state.detail);
         }
     }
 
+    public void startSteam() {
+        if (runtimeActive || SteamLegacyInstaller.isRunning()) return;
+
+        if (steamContainer == null) {
+            prepared = false;
+            preparing = false;
+            prepare();
+            return;
+        }
+
+        File steam = findSteamExecutable(steamContainer);
+        if (steam == null) {
+            installSteamLegacy();
+            return;
+        }
+
+        launchSteam(steam);
+    }
+
+    public void retry() {
+        runtimeActive = false;
+        installRequested = false;
+
+        if (steamContainer == null) {
+            prepared = false;
+            preparing = false;
+            prepare();
+            return;
+        }
+
+        File steam = findSteamExecutable(steamContainer);
+        if (steam != null) {
+            markSteamReady(steam);
+            return;
+        }
+
+        installSteamLegacy();
+    }
+
     private void doneSystem() {
-        update("system", "Sistema", "Motor listo", BootstrapStep.State.DONE, 100);
-        ConsoleLogStore.ok("RootFS listo.");
+        update("system", "Sistema", "RootFS y motor listos", BootstrapStep.State.DONE, 100);
+        ConsoleLogStore.ok("ROOTFS · listo.");
+
         String renderer = GPUHelper.glGetRenderer(activity);
         String route = describeGpuRoute();
         update("gpu", "Gráficos", route, BootstrapStep.State.DONE, 100);
-        listener.onDeviceInfo(renderer == null || renderer.isEmpty() ? "GPU no identificada" : renderer, route);
+        listener.onDeviceInfo(
+                renderer == null || renderer.isEmpty() ? "GPU no identificada" : renderer,
+                route
+        );
     }
 
     private String describeGpuRoute() {
         String route = GraphicsDrivers.getDefaultDriver(activity);
-        ConsoleLogStore.info("Ruta gráfica automática: " + route);
-        return route.startsWith(GraphicsDrivers.TURNIP) ? "Turnip + Gladio" : "Vortek + Gladio";
+        String description = route.startsWith(GraphicsDrivers.TURNIP)
+                ? "Turnip + Gladio"
+                : "Vortek + Gladio";
+        ConsoleLogStore.info("GPU · ruta automática: " + description + " (" + route + ")");
+        return description;
     }
 
     private void prepareContainer() {
-        update("container", "Entorno Steam", "Buscando entorno existente", BootstrapStep.State.RUNNING, 15);
+        update(
+                "container",
+                "Entorno Steam",
+                "Buscando prefijo DroidDeck",
+                BootstrapStep.State.RUNNING,
+                15
+        );
+
         ContainerManager manager = new ContainerManager(activity);
         for (Container candidate : manager.getContainers()) {
-            if ("t".equals(candidate.getExtra(CONTAINER_MARKER))) {
+            if ("t".equals(candidate.getExtra(CONTAINER_MARKER))
+                    || CONTAINER_NAME.equals(candidate.getName())) {
                 steamContainer = candidate;
-                update("container", "Entorno Steam", "Wine + Box64 listos", BootstrapStep.State.DONE, 100);
+                if (!"t".equals(candidate.getExtra(CONTAINER_MARKER))) {
+                    candidate.putExtra(CONTAINER_MARKER, "t");
+                    candidate.saveData();
+                }
+
                 preparing = false;
+                update("container", "Entorno Steam", "Wine + Box64 listos", BootstrapStep.State.DONE, 100);
+                ConsoleLogStore.ok("CONTENEDOR · reutilizando id=" + candidate.id + " · " + candidate.getRootDir());
                 checkSteam(true);
                 return;
             }
@@ -206,492 +261,229 @@ public final class ConsoleBootstrapController {
             data.put("hudMode", 0);
             data.put("startupSelection", Container.STARTUP_SELECTION_ESSENTIAL);
             data.put("box64Preset", Box64Preset.PERFORMANCE);
-            data.put("desktopTheme", WineThemeManager.Theme.DARK + "," + WineThemeManager.BackgroundType.COLOR + ",#080B14");
+            data.put(
+                    "desktopTheme",
+                    WineThemeManager.Theme.DARK + "," + WineThemeManager.BackgroundType.COLOR + ",#080B14"
+            );
 
-            update("container", "Entorno Steam", "Creando prefijo Wine", BootstrapStep.State.RUNNING, 45);
+            update(
+                    "container",
+                    "Entorno Steam",
+                    "Creando prefijo Wine limpio",
+                    BootstrapStep.State.RUNNING,
+                    45
+            );
+            ConsoleLogStore.info("CONTENEDOR · creando prefijo Wine para Steam.");
+
             manager.createContainerAsync(data, container -> {
                 preparing = false;
                 if (container == null) {
                     fail("container", "No se pudo crear el entorno Wine/Box64");
                     return;
                 }
+
                 container.putExtra(CONTAINER_MARKER, "t");
                 container.saveData();
                 steamContainer = container;
+
                 update("container", "Entorno Steam", "Wine + Box64 listos", BootstrapStep.State.DONE, 100);
-                ConsoleLogStore.ok("Contenedor Steam creado: id=" + container.id);
+                ConsoleLogStore.ok("CONTENEDOR · creado id=" + container.id + " · " + container.getRootDir());
                 checkSteam(true);
             });
         }
-        catch (Exception e) {
+        catch (Exception error) {
             preparing = false;
-            fail("container", e.getMessage());
+            fail("container", error.getMessage());
         }
     }
 
     private void checkSteam(boolean autoInstall) {
-        update("steam", "Steam", "Comprobando cliente", BootstrapStep.State.RUNNING, 20);
+        update("steam", "Steam", "Buscando steam.exe", BootstrapStep.State.RUNNING, 5);
+
         File steam = findSteamExecutable(steamContainer);
         if (steam != null) {
-            update("steam", "Steam", "Cliente listo", BootstrapStep.State.DONE, 100);
-            listener.onReady(true);
-        }
-        else {
-            update("steam", "Steam", "Instalación automática necesaria", BootstrapStep.State.WAITING, 0);
-            listener.onReady(false);
-            if (autoInstall) downloadAndRunInstaller();
-        }
-    }
-
-    public void startSteam() {
-        if (downloadRunning) return;
-        if (steamContainer == null) {
-            prepare();
+            markSteamReady(steam);
             return;
         }
-        File steam = findSteamExecutable(steamContainer);
-        if (steam != null) {
-            update("launch", "Inicio", "Entregando Steam al motor", BootstrapStep.State.RUNNING, 10);
-            launchWindowsExecutable(steam, null, "steam_client");
-        }
-        else downloadAndRunInstaller();
+
+        listener.onReady(false);
+        update(
+                "steam",
+                "Steam",
+                "Steam Legacy de Winlator 11.2 todavía no está instalado",
+                BootstrapStep.State.WAITING,
+                0
+        );
+        ConsoleLogStore.info("STEAM · no existe C:\\Program Files (x86)\\Steam\\steam.exe");
+
+        if (autoInstall) installSteamLegacy();
     }
 
-    public void retry() {
-        downloadRunning = false;
-        installerStarted = false;
-        pendingAutoLaunch = false;
-        runtimeActive = false;
-        steamFallbackStarted = false;
-        if (steamContainer == null) {
-            prepared = false;
-            preparing = false;
-            prepare();
-        }
-        else checkSteam(true);
-    }
+    private void installSteamLegacy() {
+        if (steamContainer == null || SteamLegacyInstaller.isRunning()) return;
 
-    private void downloadAndRunInstaller() {
-        if (downloadRunning || installerStarted) return;
         if (!hasNetwork()) {
-            fail("steam", "Sin conexión a Internet");
+            fail("steam", "Sin conexión a Internet para descargar Steam Legacy");
             return;
         }
         if (!hasEnoughSpace()) {
-            fail("steam", "No hay espacio libre suficiente para preparar Steam");
+            fail("steam", "Se necesita al menos 1 GB libre para preparar Steam");
             return;
         }
 
-        downloadRunning = true;
-        update("steam", "Steam", "Descargando instalador oficial", BootstrapStep.State.RUNNING, 2);
-        ConsoleLogStore.info("Descargando SteamSetup.exe desde el CDN oficial de Steam.");
-        io.execute(() -> {
-            File dir = new File(steamContainer.getRootDir(), ".wine/drive_c/DroidDeck");
-            if (!dir.exists() && !dir.mkdirs()) {
-                main.post(() -> {
-                    downloadRunning = false;
-                    fail("steam", "No se pudo crear C:\\DroidDeck dentro del prefijo Wine");
-                });
-                return;
-            }
-            File dst = new File(dir, "SteamSetup.exe");
-            File part = new File(dir, "SteamSetup.exe.part");
-            ConsoleLogStore.info("Destino real Wine: C:\\DroidDeck\\SteamSetup.exe");
-            ConsoleLogStore.info("Destino Android: " + dst.getAbsolutePath());
+        installRequested = true;
+        listener.onReady(false);
+        update(
+                "steam",
+                "Steam",
+                "Preparando paquete Steam Legacy de Winlator",
+                BootstrapStep.State.RUNNING,
+                1
+        );
 
-            if (isValidInstaller(dst)) {
-                main.post(() -> runInstaller(dst));
-                return;
-            }
+        ConsoleLogStore.info("STEAM · iniciando instalación directa del paquete oficial de Winlator Addons.");
+        boolean started = SteamLegacyInstaller.start(activity, steamContainer);
+        if (!started && !SteamLegacyInstaller.isRunning()) {
+            fail("steam", "No se pudo iniciar el instalador de Steam Legacy");
+        }
+    }
 
-            Exception lastError = null;
-            for (int attempt = 1; attempt <= 3; attempt++) {
-                try {
-                    downloadOnce(part, attempt);
-                    if (!isValidInstaller(part)) throw new IllegalStateException("El archivo descargado no parece ser un ejecutable válido");
-                    if (dst.exists()) dst.delete();
-                    if (!part.renameTo(dst)) throw new IllegalStateException("No se pudo finalizar el archivo descargado");
-                    main.post(() -> runInstaller(dst));
-                    return;
+    private void onInstallerState(SteamLegacyInstaller.State state) {
+        if (state == null || steamContainer == null) return;
+
+        switch (state.phase) {
+            case READY: {
+                File steam = findSteamExecutable(steamContainer);
+                if (steam != null) {
+                    installRequested = false;
+                    markSteamReady(steam);
                 }
-                catch (Exception e) {
-                    lastError = e;
-                    ConsoleLogStore.warn("Descarga Steam intento " + attempt + "/3: " + e.getMessage());
-                    try { Thread.sleep(900L * attempt); } catch (InterruptedException ignored) {}
+                else {
+                    fail("steam", "El instalador informó éxito, pero steam.exe no existe");
                 }
+                break;
             }
-            final String message = lastError != null ? lastError.getMessage() : "Error desconocido";
-            main.post(() -> {
-                downloadRunning = false;
-                fail("steam", "Descarga fallida: " + message);
-            });
-        });
+            case ERROR:
+                installRequested = false;
+                fail("steam", state.detail);
+                break;
+            case IDLE:
+                break;
+            default:
+                update(
+                        "steam",
+                        "Steam",
+                        state.detail,
+                        BootstrapStep.State.RUNNING,
+                        state.progress
+                );
+                break;
+        }
     }
 
-    private void downloadOnce(File part, int attempt) throws Exception {
-        long existing = part.isFile() ? part.length() : 0L;
-        HttpURLConnection connection = (HttpURLConnection)new URL(STEAM_INSTALLER_URL).openConnection();
-        connection.setConnectTimeout(15_000);
-        connection.setReadTimeout(60_000);
-        connection.setInstanceFollowRedirects(true);
-        connection.setRequestProperty("User-Agent", "DroidDeck/0.9 Android");
-        if (existing > 0) connection.setRequestProperty("Range", "bytes=" + existing + "-");
-        connection.connect();
+    private void markSteamReady(File steam) {
+        if (steam == null || !steam.isFile()) return;
 
-        int code = connection.getResponseCode();
-        boolean resumed = existing > 0 && code == HttpURLConnection.HTTP_PARTIAL;
-        if (code / 100 != 2) {
-            connection.disconnect();
-            throw new IllegalStateException("HTTP " + code);
-        }
-        if (!resumed) existing = 0L;
-
-        long bodyLength = connection.getContentLengthLong();
-        long expected = bodyLength > 0 ? existing + bodyLength : -1L;
-        ConsoleLogStore.info("Steam HTTP " + code
-                + (resumed ? " · reanudando desde " + formatBytes(existing) : " · descarga nueva")
-                + (expected > 0 ? " · total " + formatBytes(expected) : ""));
-
-        try (InputStream raw = new BufferedInputStream(connection.getInputStream());
-             FileOutputStream out = new FileOutputStream(part, resumed)) {
-            byte[] buffer = new byte[128 * 1024];
-            long total = existing;
-            long sampleBytes = total;
-            long sampleTime = System.currentTimeMillis();
-            long lastUi = 0L;
-            int lastLoggedPct = -5;
-            int n;
-
-            while ((n = raw.read(buffer)) != -1) {
-                out.write(buffer, 0, n);
-                total += n;
-                long now = System.currentTimeMillis();
-
-                if (now - lastUi >= 200L) {
-                    long elapsed = Math.max(1L, now - sampleTime);
-                    long delta = Math.max(0L, total - sampleBytes);
-                    double speed = (delta * 1000.0) / elapsed;
-                    sampleBytes = total;
-                    sampleTime = now;
-                    lastUi = now;
-
-                    final int pct = expected > 0 ? Math.min(100, (int)((100L * total) / expected)) : 0;
-                    final long copied = total;
-                    final long target = expected;
-                    final double bytesPerSecond = speed;
-                    final String detail = target > 0
-                            ? pct + "% · " + formatBytes(copied) + " de " + formatBytes(target) + " · " + formatSpeed(bytesPerSecond)
-                            : formatBytes(copied) + " · " + formatSpeed(bytesPerSecond);
-
-                    main.post(() -> update("steam", "Steam", detail, BootstrapStep.State.RUNNING, pct));
-
-                    if (pct >= lastLoggedPct + 5) {
-                        lastLoggedPct = pct;
-                        ConsoleLogStore.info("Steam download · " + detail);
-                    }
-                }
-            }
-            out.getFD().sync();
-        }
-        finally {
-            connection.disconnect();
-        }
-
-        long finalSize = part.length();
-        if (expected > 0 && finalSize != expected) {
-            throw new IllegalStateException("Tamaño incompleto: " + formatBytes(finalSize) + " de " + formatBytes(expected));
-        }
-        ConsoleLogStore.ok("SteamSetup.exe descargado completo · " + formatBytes(finalSize));
+        update(
+                "steam",
+                "Steam",
+                "Cliente verificado · " + humanPath(steam),
+                BootstrapStep.State.DONE,
+                100
+        );
+        update(
+                "launch",
+                "Inicio",
+                "Todo listo · inicia Steam cuando quieras",
+                BootstrapStep.State.WAITING,
+                0
+        );
+        ConsoleLogStore.ok("STEAM · cliente verificado: " + steam.getAbsolutePath());
+        listener.onReady(true);
     }
 
-    private void runInstaller(File installer) {
-        downloadRunning = false;
-        if (!isValidInstaller(installer)) {
-            fail("steam", "SteamSetup.exe no pasó la validación antes de ejecutarse");
+    private void launchSteam(File steam) {
+        if (steam == null || !steam.isFile()) {
+            fail("launch", "steam.exe desapareció antes de arrancar");
             return;
         }
 
-        String dosPath = WineUtils.unixToDOSPath(installer.getAbsolutePath(), steamContainer);
-        if (dosPath == null || dosPath.isEmpty() || !dosPath.toUpperCase(java.util.Locale.US).startsWith("C:")) {
-            fail("steam", "El instalador no quedó en una ruta válida de Wine: " + dosPath);
-            return;
-        }
+        update(
+                "launch",
+                "Inicio",
+                "Arrancando Steam con el perfil nativo de Winlator 11.2",
+                BootstrapStep.State.RUNNING,
+                10
+        );
 
-        installerStarted = true;
-        pendingAutoLaunch = false;
-        update("steam", "Steam", "Método 1/2 · instalador oficial en C:\\Steam", BootstrapStep.State.RUNNING, 98);
-        ConsoleLogStore.ok("Instalador listo · " + formatBytes(installer.length()) + " · " + dosPath);
-        ConsoleLogStore.info("Solicitando ejecución oficial: " + dosPath + " /S /D=C:\\Steam");
-        launchWindowsExecutable(installer, "/S /D=C:\\Steam", "steam_install");
-    }
-
-    private void launchWindowsExecutable(File executable, String args, String purpose) {
-        String dosPath = WineUtils.unixToDOSPath(executable.getAbsolutePath(), steamContainer);
-        if (dosPath == null || dosPath.isEmpty() || !dosPath.contains(":")) {
-            fail("steam", "Wine no pudo mapear el ejecutable: " + executable.getAbsolutePath());
-            return;
-        }
-        ConsoleLogStore.info("Ruta Wine resuelta: " + dosPath);
-        Intent intent = new Intent(activity, XServerDisplayActivity.class);
-        intent.putExtra("container_id", steamContainer.id);
-        intent.putExtra("exec_path", executable.getAbsolutePath());
-        if (args != null && !args.trim().isEmpty()) intent.putExtra("exec_args", args.trim());
-        intent.putExtra("droiddeck_console", true);
-        intent.putExtra("droiddeck_purpose", purpose);
-        runtimeActive = true;
-        activity.startActivityForResult(intent, REQUEST_RUNTIME);
-        ConsoleLogStore.info("Wine launch [" + purpose + "]: " + executable.getAbsolutePath() + (args == null ? "" : " " + args));
-    }
-
-    private void launchWindowsDosExecutable(String dosPath, String args, String purpose) {
-        if (dosPath == null || dosPath.trim().isEmpty() || !dosPath.contains(":")) {
-            fail("steam", "Ruta DOS inválida: " + dosPath);
-            return;
-        }
+        ConsoleLogStore.info("LAUNCH · steam.exe: " + steam.getAbsolutePath());
+        ConsoleLogStore.info("LAUNCH · Box64 aplicará el bloque [steam.exe] de default.box64rc.");
 
         Intent intent = new Intent(activity, XServerDisplayActivity.class);
         intent.putExtra("container_id", steamContainer.id);
-        intent.putExtra("exec_dos_path", dosPath.trim());
-        if (args != null && !args.trim().isEmpty()) intent.putExtra("exec_args", args.trim());
+        intent.putExtra("exec_path", steam.getAbsolutePath());
         intent.putExtra("droiddeck_console", true);
-        intent.putExtra("droiddeck_purpose", purpose);
+        intent.putExtra("droiddeck_purpose", "steam_client");
 
         runtimeActive = true;
         activity.startActivityForResult(intent, REQUEST_RUNTIME);
-        ConsoleLogStore.info("Wine DOS launch [" + purpose + "]: " + dosPath + (args == null ? "" : " " + args));
     }
 
     public void handleRuntimeResult(int resultCode, Intent data) {
         runtimeActive = false;
+
         if (resultCode != Activity.RESULT_OK || data == null) {
-            ConsoleLogStore.warn("El runtime volvió sin código de salida utilizable.");
-            refreshAfterResume();
+            ConsoleLogStore.warn("RUNTIME · Steam volvió sin código de salida utilizable.");
+            File steam = findSteamExecutable(steamContainer);
+            if (steam != null) {
+                update("launch", "Inicio", "Steam se cerró o volvió al launcher", BootstrapStep.State.WAITING, 0);
+                listener.onReady(true);
+            }
             return;
         }
+
         int status = data.getIntExtra("droiddeck_runtime_exit_status", Integer.MIN_VALUE);
         String purpose = data.getStringExtra("droiddeck_runtime_purpose");
-        ConsoleLogStore.info("Runtime finalizado · propósito=" + purpose + " · código=" + status);
-
-        if ("steam_install".equals(purpose)) {
-            installerStarted = false;
-            File steam = findSteamExecutableDeep(steamContainer);
-            if (steam != null) {
-                markSteamReady(steam);
-                return;
-            }
-
-            ConsoleLogStore.warn("Método 1/2 terminó con código " + status + " y no produjo steam.exe.");
-            logSteamDirectoryState();
-            if (!steamFallbackStarted) startWinlatorSteamFallback();
-            else fail("steam", "El instalador oficial terminó sin producir steam.exe");
-            return;
-        }
-
-        if ("steam_fallback".equals(purpose)) {
-            installerStarted = false;
-            File steam = findSteamExecutableDeep(steamContainer);
-            if (steam != null) {
-                markSteamReady(steam);
-                return;
-            }
-
-            ConsoleLogStore.error("Método 2/2 terminó con código " + status + " y tampoco produjo steam.exe.");
-            logSteamDirectoryState();
-            pendingAutoLaunch = false;
-            fail("steam", "Los dos métodos de instalación terminaron sin producir steam.exe");
-            return;
-        }
+        ConsoleLogStore.info("RUNTIME · propósito=" + purpose + " · código=" + status);
 
         if ("steam_client".equals(purpose)) {
             if (status == 0) {
-                update("launch", "Inicio", "Steam cerrado por el usuario", BootstrapStep.State.DONE, 100);
+                update("launch", "Inicio", "Steam cerrado", BootstrapStep.State.DONE, 100);
             }
             else {
-                fail("launch", "Steam terminó con código " + status + ". Revisa la consola.");
+                fail("launch", "Steam terminó con código " + status + " · revisa la consola real");
             }
-            return;
         }
-
-        refreshAfterResume();
-    }
-
-    private void waitForSteamAfterInstall(int attempt) {
-        File steam = findSteamExecutable(steamContainer);
-        if (steam != null) {
-            installerStarted = false;
-            ConsoleLogStore.ok("steam.exe encontrado: " + steam.getAbsolutePath());
-            markSteamReady(steam);
-            return;
-        }
-
-        if (attempt >= 120) {
-            installerStarted = false;
-            File deep = findSteamExecutableDeep(steamContainer);
-            if (deep != null) {
-                ConsoleLogStore.ok("steam.exe localizado por búsqueda profunda: " + deep.getAbsolutePath());
-                markSteamReady(deep);
-                return;
-            }
-
-            logSteamDirectoryState();
-            if (!steamFallbackStarted) {
-                startWinlatorSteamFallback();
-            }
-            else {
-                pendingAutoLaunch = false;
-                fail("steam", "Los dos métodos de instalación terminaron sin producir steam.exe");
-            }
-            return;
-        }
-
-        int seconds = attempt / 2;
-        int progress = Math.min(99, 97 + (attempt / 60));
-        update("steam", "Steam",
-                "Finalizando instalación… " + seconds + " s · buscando steam.exe",
-                BootstrapStep.State.RUNNING, progress);
-        if (attempt % 4 == 0) {
-            ConsoleLogStore.info("Verificando steam.exe… " + seconds + " s / 60 s");
-        }
-        main.postDelayed(() -> waitForSteamAfterInstall(attempt + 1), 500);
-    }
-
-    private void startWinlatorSteamFallback() {
-        steamFallbackStarted = true;
-        installerStarted = true;
-
-        RootFS root = RootFS.find(activity);
-        File source = new File(root.getRootDir(), "opt/apps/winaddons.exe");
-        if (!source.isFile()) {
-            installerStarted = false;
-            fail("steam", "Fallback no disponible: falta Z:\\opt\\apps\\winaddons.exe");
-            return;
-        }
-
-        update("steam", "Steam", "Método 2/2 · instalador compatible de Winlator", BootstrapStep.State.RUNNING, 98);
-        ConsoleLogStore.warn("SteamSetup oficial no produjo steam.exe; activando fallback compatible de Winlator.");
-        ConsoleLogStore.info("Fallback directo: Z:\\opt\\apps\\winaddons.exe -n \"Steam (Legacy)\" -d \"Steam\" -e \"steam.exe\"");
-        launchWindowsDosExecutable(
-                "Z:\\opt\\apps\\winaddons.exe",
-                "-n \"Steam (Legacy)\" -d \"Steam\" -e \"steam.exe\"",
-                "steam_fallback"
-        );
-    }
-
-    private void waitForSteamAfterFallback(int attempt) {
-        File steam = findSteamExecutableDeep(steamContainer);
-        if (steam != null) {
-            installerStarted = false;
-            ConsoleLogStore.ok("steam.exe encontrado por fallback: " + steam.getAbsolutePath());
-            markSteamReady(steam);
-            return;
-        }
-
-        if (attempt >= 180) {
-            installerStarted = false;
-            pendingAutoLaunch = false;
-            logSteamDirectoryState();
-            fail("steam", "Fallback de Winlator terminó, pero steam.exe tampoco apareció");
-            return;
-        }
-
-        int seconds = attempt / 2;
-        update(
-                "steam",
-                "Steam",
-                "Método 2/2 trabajando · " + seconds + " s · buscando steam.exe",
-                BootstrapStep.State.RUNNING,
-                Math.min(99, 98 + attempt / 120)
-        );
-        if (attempt % 10 == 0) {
-            ConsoleLogStore.info("Fallback Winlator · verificando steam.exe · " + seconds + " s");
-        }
-        main.postDelayed(() -> waitForSteamAfterFallback(attempt + 1), 500L);
-    }
-
-    private void markSteamReady(File steam) {
-        update("steam", "Steam", "Instalación completada", BootstrapStep.State.DONE, 100);
-        ConsoleLogStore.ok("Steam listo: " + steam.getAbsolutePath());
-        listener.onReady(true);
-        pendingAutoLaunch = false;
-        update("launch", "Inicio", "Todo listo · inicia Steam cuando quieras", BootstrapStep.State.WAITING, 0);
-    }
-
-    private void logSteamDirectoryState() {
-        if (steamContainer == null) return;
-        File driveC = new File(steamContainer.getRootDir(), ".wine/drive_c");
-        File steamRoot = new File(driveC, "Steam");
-        File programFiles = new File(driveC, "Program Files (x86)");
-        File programFiles64 = new File(driveC, "Program Files");
-        ConsoleLogStore.warn("Inspección C:\\: " + listNames(driveC));
-        ConsoleLogStore.warn("Inspección C:\\Steam: " + listNames(steamRoot));
-        ConsoleLogStore.warn("Inspección C:\\Program Files (x86): " + listNames(programFiles));
-        ConsoleLogStore.warn("Inspección C:\\Program Files: " + listNames(programFiles64));
-    }
-
-    private String listNames(File dir) {
-        if (dir == null || !dir.isDirectory()) return "[no existe]";
-        String[] names = dir.list();
-        if (names == null || names.length == 0) return "[vacío]";
-        java.util.Arrays.sort(names, String.CASE_INSENSITIVE_ORDER);
-        StringBuilder out = new StringBuilder();
-        for (int i = 0; i < names.length && i < 40; i++) {
-            if (i > 0) out.append(", ");
-            out.append(names[i]);
-        }
-        return out.toString();
     }
 
     private File findSteamExecutable(Container container) {
         if (container == null) return null;
+
         String[] paths = {
-                ".wine/drive_c/Steam/steam.exe",
                 ".wine/drive_c/Program Files (x86)/Steam/steam.exe",
-                ".wine/drive_c/Program Files/Steam/steam.exe",
-                ".wine/drive_c/users/xuser/AppData/Local/Steam/steam.exe"
+                ".wine/drive_c/Steam/steam.exe",
+                ".wine/drive_c/Program Files/Steam/steam.exe"
         };
+
         for (String path : paths) {
-            File f = new File(container.getRootDir(), path);
-            if (f.isFile()) return f;
-        }
-        return null;
-    }
-
-    private File findSteamExecutableDeep(Container container) {
-        File direct = findSteamExecutable(container);
-        if (direct != null) return direct;
-        File driveC = new File(container.getRootDir(), ".wine/drive_c");
-        return findSteamRecursive(driveC, 0);
-    }
-
-    private File findSteamRecursive(File dir, int depth) {
-        if (dir == null || !dir.isDirectory() || depth > 7) return null;
-        String name = dir.getName();
-        if ("windows".equalsIgnoreCase(name) || "$Recycle.Bin".equalsIgnoreCase(name)) return null;
-
-        File[] children = dir.listFiles();
-        if (children == null) return null;
-        for (File child : children) {
-            if (child.isFile() && "steam.exe".equalsIgnoreCase(child.getName())) return child;
-        }
-        for (File child : children) {
-            if (child.isDirectory()) {
-                File found = findSteamRecursive(child, depth + 1);
-                if (found != null) return found;
-            }
+            File file = new File(container.getRootDir(), path);
+            if (file.isFile() && file.length() > 256 * 1024L) return file;
         }
         return null;
     }
 
     private boolean hasNetwork() {
         try {
-            ConnectivityManager cm = (ConnectivityManager)activity.getSystemService(AppCompatActivity.CONNECTIVITY_SERVICE);
-            if (cm == null) return false;
-            Network network = cm.getActiveNetwork();
+            ConnectivityManager manager =
+                    (ConnectivityManager)activity.getSystemService(AppCompatActivity.CONNECTIVITY_SERVICE);
+            if (manager == null) return false;
+            Network network = manager.getActiveNetwork();
             if (network == null) return false;
-            NetworkCapabilities caps = cm.getNetworkCapabilities(network);
-            return caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+            NetworkCapabilities capabilities = manager.getNetworkCapabilities(network);
+            return capabilities != null
+                    && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
         }
-        catch (Exception e) {
+        catch (Exception ignored) {
             return true;
         }
     }
@@ -699,43 +491,42 @@ public final class ConsoleBootstrapController {
     private boolean hasEnoughSpace() {
         try {
             StatFs stat = new StatFs(activity.getFilesDir().getAbsolutePath());
-            return stat.getAvailableBytes() >= MIN_FREE_BYTES;
+            long available = stat.getAvailableBytes();
+            ConsoleLogStore.info("DISCO · libre " + formatBytes(available));
+            return available >= MIN_FREE_BYTES;
         }
-        catch (Exception e) {
+        catch (Exception ignored) {
             return true;
         }
     }
 
-    private boolean isValidInstaller(File file) {
-        if (file == null || !file.isFile() || file.length() < MIN_INSTALLER_BYTES) return false;
-        try (FileInputStream in = new FileInputStream(file)) {
-            return in.read() == 'M' && in.read() == 'Z';
+    private String humanPath(File file) {
+        if (steamContainer == null || file == null) return "";
+        String base = new File(steamContainer.getRootDir(), ".wine/drive_c").getAbsolutePath();
+        String path = file.getAbsolutePath();
+        if (path.startsWith(base)) {
+            return "C:" + path.substring(base.length()).replace('/', '\\');
         }
-        catch (Exception e) {
-            return false;
-        }
+        return file.getName();
     }
 
     private String formatBytes(long bytes) {
-        if (bytes >= 1024L * 1024L) return String.format(java.util.Locale.US, "%.1f MB", bytes / 1048576.0);
-        if (bytes >= 1024L) return String.format(java.util.Locale.US, "%.0f KB", bytes / 1024.0);
+        if (bytes >= 1024L * 1024L * 1024L) {
+            return String.format(java.util.Locale.US, "%.2f GB", bytes / 1073741824.0);
+        }
+        if (bytes >= 1024L * 1024L) {
+            return String.format(java.util.Locale.US, "%.1f MB", bytes / 1048576.0);
+        }
+        if (bytes >= 1024L) {
+            return String.format(java.util.Locale.US, "%.0f KB", bytes / 1024.0);
+        }
         return bytes + " B";
     }
 
-    private String formatSpeed(double bytesPerSecond) {
-        if (bytesPerSecond >= 1024.0 * 1024.0) {
-            return String.format(java.util.Locale.US, "%.1f MB/s", bytesPerSecond / 1048576.0);
-        }
-        if (bytesPerSecond >= 1024.0) {
-            return String.format(java.util.Locale.US, "%.0f KB/s", bytesPerSecond / 1024.0);
-        }
-        return String.format(java.util.Locale.US, "%.0f B/s", bytesPerSecond);
-    }
-
     private void fail(String id, String message) {
-        String safe = message == null || message.isEmpty() ? "Error desconocido" : message;
+        String safe = message == null || message.trim().isEmpty() ? "Error desconocido" : message.trim();
         update(id, titleFor(id), safe, BootstrapStep.State.ERROR, 0);
-        ConsoleLogStore.error(id + ": " + safe);
+        ConsoleLogStore.error(id.toUpperCase(java.util.Locale.US) + " · " + safe);
     }
 
     private String titleFor(String id) {
@@ -744,7 +535,13 @@ public final class ConsoleBootstrapController {
     }
 
     private void update(String id, String title, String detail, BootstrapStep.State state, int progress) {
-        BootstrapStep step = new BootstrapStep(id, title, detail, state, progress);
+        BootstrapStep step = new BootstrapStep(
+                id,
+                title,
+                detail,
+                state,
+                Math.max(0, Math.min(100, progress))
+        );
         steps.put(id, step);
         if (listener != null) listener.onStep(step);
     }
