@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="console_name">DroidDeck</string>
+    <string name="console_subtitle">Steam en Android · automático</string>
+    <string name="console_start_steam">INICIAR STEAM</string>
+    <string name="console_controls">CONTROLES</string>
+    <string name="console_diagnostics">DIAGNÓSTICO</string>
+    <string name="console_retry">REINTENTAR</string>
+</resources>
