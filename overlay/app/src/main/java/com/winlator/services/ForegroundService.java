@@ -316,7 +316,10 @@ public class ForegroundService extends Service {
             // Only call startForeground the first time. Use notify() for updates.
             if (!serviceRunning.get()) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    startForeground(notificationId, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+                    int foregroundType = installerActive.get() && !sessionActive.get()
+                            ? ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                            : ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK;
+                    startForeground(notificationId, n, foregroundType);
                 }
                 else {
                     startForeground(notificationId, n);
