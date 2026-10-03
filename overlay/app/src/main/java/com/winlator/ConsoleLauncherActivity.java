@@ -2,6 +2,7 @@ package com.winlator;
 
 import android.Manifest;
 import android.app.ActivityManager;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -31,14 +32,19 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
 
     private final Map<String, TextView> statusViews = new HashMap<>();
     private final Map<String, ProgressBar> progressViews = new HashMap<>();
+
     private ConsoleBootstrapController controller;
     private Button startButton;
     private TextView steamState;
     private TextView deviceInfo;
+    private TextView currentStage;
+    private TextView currentDetail;
+    private TextView currentPercent;
+    private ProgressBar currentProgress;
     private TextView logView;
     private TextView logPath;
-    private View logPanel;
     private ScrollView logScroll;
+    private View errorActions;
     private boolean permissionsBlocked;
 
     @Override
@@ -58,31 +64,42 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
         startButton = findViewById(R.id.BTStartSteam);
         steamState = findViewById(R.id.TVSteamState);
         deviceInfo = findViewById(R.id.TVDeviceInfo);
+        currentStage = findViewById(R.id.TVCurrentStage);
+        currentDetail = findViewById(R.id.TVCurrentDetail);
+        currentPercent = findViewById(R.id.TVCurrentPercent);
+        currentProgress = findViewById(R.id.PBCurrent);
         logView = findViewById(R.id.TVConsoleLog);
         logPath = findViewById(R.id.TVLogPath);
-        logPanel = findViewById(R.id.LogPanel);
         logScroll = findViewById(R.id.SVConsoleLog);
+        errorActions = findViewById(R.id.ErrorActions);
 
         ConsoleLogStore.initialize(this);
         ConsoleLogStore.addListener(this);
-        logPath.setText("Registro: " + ConsoleLogStore.getSessionFilePath());
+        logPath.setText(ConsoleLogStore.getSessionFilePath());
 
         controller = new ConsoleBootstrapController(this, this);
+
         startButton.setEnabled(false);
         startButton.setOnClickListener(v -> {
             if (permissionsBlocked) requestRequiredPermissions();
             else controller.startSteam();
         });
 
-        findViewById(R.id.BTDiagnostics).setOnClickListener(v -> toggleDiagnostics());
-        findViewById(R.id.BTCloseDiagnostics).setOnClickListener(v -> logPanel.setVisibility(View.GONE));
+        findViewById(R.id.BTDiagnostics).setOnClickListener(v -> {
+            logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
+            ConsoleLogStore.info("Diagnóstico visible en la mitad derecha.");
+        });
+
+        findViewById(R.id.BTCloseDiagnostics).setOnClickListener(v -> errorActions.setVisibility(View.GONE));
+
         findViewById(R.id.BTRetry).setOnClickListener(v -> {
-            logPanel.setVisibility(View.GONE);
+            errorActions.setVisibility(View.GONE);
             controller.retry();
         });
+
         findViewById(R.id.BTControls).setOnClickListener(v -> {
-            steamState.setText("Los controles táctiles se aplicarán por juego");
-            ConsoleLogStore.info("Panel de controles táctiles solicitado.");
+            steamState.setText("Controles táctiles: configuración automática por juego");
+            ConsoleLogStore.info("Controles táctiles: se conservará el motor de perfiles de Winlator.");
         });
 
         showDeviceBasics();
@@ -100,6 +117,7 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
             }
         }
         catch (Exception ignored) {}
+
         String ram = totalMb > 0 ? " · " + totalMb + " MB RAM" : "";
         deviceInfo.setText(Build.MANUFACTURER + " " + Build.MODEL + ram);
     }
@@ -118,6 +136,7 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             pending.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
         }
+
         if (pending.isEmpty()) {
             permissionsBlocked = false;
             if (controller != null) controller.setPermissionsReady(true, "Almacenamiento autorizado");
@@ -136,8 +155,10 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode != STORAGE_PERMISSION_REQUEST) return;
+
         boolean granted = grantResults.length > 0;
         for (int result : grantResults) granted &= result == PackageManager.PERMISSION_GRANTED;
+
         if (granted) {
             permissionsBlocked = false;
             controller.setPermissionsReady(true, "Almacenamiento autorizado");
@@ -148,7 +169,7 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
             controller.setPermissionsReady(false, "Permiso rechazado · toca para volver a solicitarlo");
             startButton.setEnabled(true);
             startButton.setText("CONCEDER PERMISOS");
-            showDiagnostics();
+            showErrorActions();
         }
     }
 
@@ -162,7 +183,16 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
     @Override
     protected void onResume() {
         super.onResume();
+        AppUtils.hideSystemUI(this);
         if (controller != null && !permissionsBlocked) controller.refreshAfterResume();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == ConsoleBootstrapController.REQUEST_RUNTIME && controller != null) {
+            controller.handleRuntimeResult(resultCode, data);
+        }
     }
 
     @Override
@@ -182,6 +212,7 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
             TextView text = statusViews.get(step.id);
             ProgressBar progress = progressViews.get(step.id);
             if (text == null || progress == null) return;
+
             String glyph;
             int color;
             switch (step.state) {
@@ -202,14 +233,30 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
                     color = R.color.console_muted;
                     break;
             }
+
             text.setText(glyph + "  " + step.title + "\n" + step.detail);
             text.setTextColor(ContextCompat.getColor(this, color));
             progress.setProgress(step.progress);
             progress.setVisibility(step.state == BootstrapStep.State.RUNNING ? View.VISIBLE : View.GONE);
+
+            if (step.state == BootstrapStep.State.RUNNING || step.state == BootstrapStep.State.ERROR) {
+                currentStage.setText(step.title);
+                currentDetail.setText(step.detail);
+                currentProgress.setProgress(step.progress);
+                currentPercent.setText(step.progress + "%");
+            }
+            else if (step.state == BootstrapStep.State.DONE && "launch".equals(step.id)) {
+                currentStage.setText("Listo");
+                currentDetail.setText(step.detail);
+                currentProgress.setProgress(100);
+                currentPercent.setText("100%");
+            }
+
             if (step.state == BootstrapStep.State.ERROR) {
                 startButton.setEnabled(true);
                 startButton.setText("REINTENTAR");
-                showDiagnostics();
+                steamState.setText("Se produjo un error · el detalle está visible a la derecha");
+                showErrorActions();
             }
         });
     }
@@ -220,36 +267,31 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
             if (steamInstalled) {
                 startButton.setEnabled(true);
                 startButton.setText("INICIAR STEAM");
-                steamState.setText("Steam está listo · toca para jugar");
+                steamState.setText("Steam está listo");
             }
             else {
                 startButton.setEnabled(false);
                 startButton.setText("INSTALANDO STEAM…");
-                steamState.setText("Primera configuración · todo se instalará automáticamente");
+                steamState.setText("Primera configuración automática en curso");
             }
         });
     }
 
     @Override
     public void onDeviceInfo(String gpu, String route) {
-        runOnUiThread(() -> deviceInfo.setText(gpu + "  ·  " + route));
+        runOnUiThread(() -> deviceInfo.setText(gpu + " · " + route));
     }
 
     @Override
     public void onLogChanged(String fullLog) {
         runOnUiThread(() -> {
-            logView.setText(fullLog.isEmpty() ? "Sin errores. El diagnóstico aparecerá aquí." : fullLog);
+            logView.setText(fullLog.isEmpty() ? "Esperando actividad…" : fullLog);
             logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
         });
     }
 
-    private void toggleDiagnostics() {
-        if (logPanel.getVisibility() == View.VISIBLE) logPanel.setVisibility(View.GONE);
-        else showDiagnostics();
-    }
-
-    private void showDiagnostics() {
-        logPanel.setVisibility(View.VISIBLE);
+    private void showErrorActions() {
+        errorActions.setVisibility(View.VISIBLE);
         logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
     }
 }
