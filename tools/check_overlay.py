@@ -11,6 +11,7 @@ required = [
     root / "overlay/app/src/main/java/com/winlator/console/ConsoleLogStore.java",
     root / "overlay/app/src/main/java/com/winlator/console/BootstrapStep.java",
     root / "overlay/app/src/main/java/com/winlator/console/RuntimeConsoleOverlay.java",
+    root / "overlay/app/src/main/java/com/winlator/console/SteamRuntimeWatchdog.java",
     root / "overlay/app/src/main/res/layout/droiddeck_runtime_overlay.xml",
     root / "overlay/app/src/main/res/layout/console_launcher_activity.xml",
     root / "overlay/app/src/main/res/drawable/console_status_chip.xml",
@@ -51,7 +52,7 @@ for token in ["requestRequiredPermissions", "onActivityResult", "TVCurrentPercen
         raise SystemExit(f"launcher incompleto: falta {token}")
 
 runtime_overlay = (root / "overlay/app/src/main/java/com/winlator/console/RuntimeConsoleOverlay.java").read_text()
-for token in ["ARRANQUE", "Wine y prefijo", "Vortek / Gladio", "Box64 + Wine", "Ventana de Steam"]:
+for token in ["ARRANQUE", "Wine y prefijo", "Vortek / Gladio", "Box64 + Wine", "Ventana de Steam", "waitingTelemetry", "95% ·"]:
     if token not in runtime_overlay:
         raise SystemExit(f"overlay runtime incompleto: falta {token}")
 
@@ -59,7 +60,11 @@ patcher = (root / "tools/apply_overlay.py").read_text()
 for token in [
     "/data/data/com.droiddeck.console/",
     "runOnUiThread",
-    'versionName "0.5.0-m5"',
+    'versionName "0.6.0-m6"',
+    "SteamRuntimeWatchdog",
+    "droidDeckSteamWatchdog = new SteamRuntimeWatchdog",
+    'android:label="DroidDeck"',
+    'android:roundIcon="@drawable/ic_droiddeck_logo"',
     "RuntimeConsoleOverlay",
     'droidDeckRuntimeOverlay.stage("Wine"',
     'droidDeckRuntimeOverlay.stage("Gráficos"',
@@ -71,4 +76,4 @@ for token in [
     if token not in patcher:
         raise SystemExit(f"parche M5 incompleto: falta {token}")
 
-print("Overlay M5 válido: Winlator oculto, telemetría real, Steam manual y segundo plano activos.")
+print("Overlay M6 válido: Steam C:\\Steam, watchdog vivo, tráfico/procesos y branding DroidDeck.")
