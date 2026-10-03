@@ -66,6 +66,17 @@ text = text.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawab
 text = text.replace('android:authorities="com.winlator.FileProvider"', 'android:authorities="com.droiddeck.console.FileProvider"')
 text = text.replace('android:label="@string/app_name">', 'android:label="DroidDeck">')
 text = text.replace('android:name="com.winlator.ConsoleLauncherActivity"\n            android:theme=', 'android:name="com.winlator.ConsoleLauncherActivity"\n            android:label="DroidDeck"\n            android:icon="@drawable/ic_droiddeck_logo"\n            android:theme=')
+if "android.permission.FOREGROUND_SERVICE_DATA_SYNC" not in text:
+    text = text.replace(
+        '<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />',
+        '<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />\n'
+        '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />'
+    )
+text = text.replace(
+    'android:foregroundServiceType="mediaPlayback"',
+    'android:foregroundServiceType="mediaPlayback|dataSync"'
+)
+
 if "android:requestLegacyExternalStorage=" not in text:
     if 'android:label="DroidDeck">' in text:
         text = text.replace('android:label="DroidDeck">', 'android:label="DroidDeck"\n        android:requestLegacyExternalStorage="true">', 1)
@@ -75,7 +86,9 @@ manifest.write_text(text, encoding="utf-8")
 
 btext = build_gradle.read_text(encoding="utf-8")
 btext = btext.replace("applicationId 'com.winlator'", "applicationId 'com.droiddeck.console'")
-btext = btext.replace('versionName "11.2"', 'versionName "0.9.0-m9"')
+btext = btext.replace('versionName "11.2"', 'versionName "1.0.0-m10"')
+btext = btext.replace("org.tukaani:xz:1.7", "org.tukaani:xz:1.12")
+btext = btext.replace("org.apache.commons:commons-compress:1.20", "org.apache.commons:commons-compress:1.28.0")
 build_gradle.write_text(btext, encoding="utf-8")
 
 for strings in (src / "app/src/main/res").glob("values*/strings.xml"):
@@ -549,5 +562,5 @@ notification_utils.write_text(nutext, encoding="utf-8")
 
 apply_native_security_fixes(src)
 
-print("Overlay DroidDeck M9 aplicado.")
+print("Overlay DroidDeck M10 aplicado.")
 print("Base esperada:", EXPECTED_SHA)
