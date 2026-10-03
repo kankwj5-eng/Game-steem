@@ -359,7 +359,11 @@ jobs:
             --enable=warning,performance,portability \
             --inconclusive \
             --std=c++17 \
+            -DPIPE_OS_ANDROID \
+            -D__ANDROID__ \
+            -D__ANDROID_API__=26 \
             --suppress=missingIncludeSystem \
+            --suppressions-list=tools/cppcheck-suppressions.txt \
             --xml \
             --xml-version=2 \
             -j 2 \
