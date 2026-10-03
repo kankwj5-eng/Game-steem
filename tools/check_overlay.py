@@ -50,7 +50,7 @@ patcher = (root / "tools/apply_overlay.py").read_text()
 for token in [
     "/data/data/com.droiddeck.console/",
     "runOnUiThread",
-    'versionName \\"0.4.0-m4\\"',
+    'versionName "0.4.0-m4"',
 ]:
     if token not in patcher:
         raise SystemExit(f"parche M4 incompleto: falta {token}")
