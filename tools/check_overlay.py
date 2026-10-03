@@ -46,6 +46,10 @@ for token in [
     "enable_background_protection",
     "enable_background_wakelock",
     "retry()",
+    "steam_fallback",
+    "launchWindowsDosExecutable",
+    "Z:\\\\opt\\\\apps\\\\winaddons.exe",
+    "Método 2/2",
 ]:
     if token not in controller:
         raise SystemExit(f"controlador incompleto: falta {token}")
@@ -61,10 +65,11 @@ for token in [
     "scanSteamFiles",
     "POSIBLE BLOQUEO REAL",
     "steam_install",
+    "steam_fallback",
     "fileWriteRate",
 ]:
     if token not in watchdog:
-        raise SystemExit(f"watchdog M8 incompleto: falta {token}")
+        raise SystemExit(f"watchdog M9 incompleto: falta {token}")
 
 runtime_overlay = (root / "overlay/app/src/main/java/com/winlator/console/RuntimeConsoleOverlay.java").read_text()
 for token in ["ARRANQUE", "Wine y prefijo", "Vortek / Gladio", "Box64 + Wine", "Ventana de Steam", "waitingTelemetry", "95% ·"]:
@@ -90,7 +95,7 @@ patcher = (root / "tools/apply_overlay.py").read_text()
 for token in [
     "/data/data/com.droiddeck.console/",
     "runOnUiThread",
-    'versionName "0.8.0-m8"',
+    'versionName "0.9.0-m9"',
     "SteamRuntimeWatchdog",
     "droidDeckSteamWatchdog = new SteamRuntimeWatchdog",
     'android:label="DroidDeck"',
@@ -105,16 +110,19 @@ for token in [
     "waitForDroidDeckSteamInstaller",
     "findDroidDeckSteamExecutable",
     "finishDroidDeckRuntime",
+    "exec_dos_path",
+    "COMANDO EFECTIVO",
+    "steam_fallback",
     "120000L",
     "steam.exe no apareció tras 120 s",
 ]:
     if token not in patcher:
-        raise SystemExit(f"parche M8 incompleto: falta {token}")
+        raise SystemExit(f"parche M9 incompleto: falta {token}")
 
 launcher_xml = (root / "overlay/app/src/main/res/layout/console_launcher_activity.xml").read_text()
 runtime_xml = (root / "overlay/app/src/main/res/layout/droiddeck_runtime_overlay.xml").read_text()
 for token in ['@drawable/ic_droiddeck_logo', 'DROIDDECK']:
     if token not in launcher_xml or token not in runtime_xml:
-        raise SystemExit(f"branding M8 incompleto: falta {token}")
+        raise SystemExit(f"branding M9 incompleto: falta {token}")
 
-print("Overlay M8 válido: runtime, branding y fixes nativos de seguridad integrados.")
+print("Overlay M9 válido: telemetría viva, fallback Steam y comando efectivo integrados.")
