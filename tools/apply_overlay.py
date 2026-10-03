@@ -73,7 +73,7 @@ manifest.write_text(text, encoding="utf-8")
 
 btext = build_gradle.read_text(encoding="utf-8")
 btext = btext.replace("applicationId 'com.winlator'", "applicationId 'com.droiddeck.console'")
-btext = btext.replace('versionName "11.2"', 'versionName "0.6.0-m6"')
+btext = btext.replace('versionName "11.2"', 'versionName "0.7.0-m7"')
 build_gradle.write_text(btext, encoding="utf-8")
 
 for strings in (src / "app/src/main/res").glob("values*/strings.xml"):
@@ -199,12 +199,12 @@ if 'droiddeck_runtime_exit_status' not in xtext:
         '            if (droidDeckConsoleMode) {\n'
         '                runOnUiThread(() -> {\n'
         '                    if (isFinishing() || isDestroyed()) return;\n'
-        '                    ConsoleLogStore.append("RUNTIME", "Proceso finalizado con código " + status);\n'
-        '                    Intent result = new Intent();\n'
-        '                    result.putExtra("droiddeck_runtime_exit_status", status);\n'
-        '                    result.putExtra("droiddeck_runtime_purpose", getIntent().getStringExtra("droiddeck_purpose"));\n'
-        '                    setResult(Activity.RESULT_OK, result);\n'
-        '                    finish();\n'
+        '                    String purpose = getIntent().getStringExtra("droiddeck_purpose");\n'
+        '                    ConsoleLogStore.append("RUNTIME", "Proceso principal finalizado con código " + status + " · " + purpose);\n'
+        '                    if ("steam_install".equals(purpose)) {\n'
+        '                        waitForDroidDeckSteamInstaller(status, android.os.SystemClock.elapsedRealtime());\n'
+        '                    }\n'
+        '                    else finishDroidDeckRuntime(status);\n'
         '                });\n'
         '            }\n'
         '            else runOnUiThread(this::exit);\n'
@@ -231,6 +231,82 @@ if 'intent.getStringExtra("exec_args")' not in xtext:
         raise SystemExit("bloque exec_path esperado no encontrado en XServerDisplayActivity")
     xtext = xtext.replace(old_exec, new_exec)
 
+
+# Keep the Wine environment alive after SteamSetup's parent process exits.
+if 'waitForDroidDeckSteamInstaller' not in xtext:
+    installer_anchor = "    private boolean isGenerateWineprefix() {"
+    installer_methods = (
+        "    private void waitForDroidDeckSteamInstaller(int parentStatus, long waitStartedAt) {\n"
+        "        if (isFinishing() || isDestroyed()) return;\n"
+        "        File steamExe = findDroidDeckSteamExecutable();\n"
+        "        long elapsed = android.os.SystemClock.elapsedRealtime() - waitStartedAt;\n"
+        "        int seconds = (int)(elapsed / 1000L);\n"
+        "        if (steamExe != null && steamExe.isFile()) {\n"
+        "            ConsoleLogStore.append(\\"OK\\", \\"Steam instalado: \\" + steamExe.getAbsolutePath());\n"
+        "            if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\\"Steam\\", \\"steam.exe encontrado · instalación completada\\", 100);\n"
+        "            getWindow().getDecorView().postDelayed(() -> finishDroidDeckRuntime(0), 350L);\n"
+        "            return;\n"
+        "        }\n"
+        "        if (elapsed >= 120000L) {\n"
+        "            ConsoleLogStore.append(\\"ERROR\\", \\"SteamSetup terminó pero steam.exe no apareció tras 120 s.\\");\n"
+        "            finishDroidDeckRuntime(parentStatus != 0 ? parentStatus : 66);\n"
+        "            return;\n"
+        "        }\n"
+        "        int progress = Math.min(99, 96 + (seconds / 40));\n"
+        "        if (droidDeckRuntimeOverlay != null) droidDeckRuntimeOverlay.stage(\\"Steam\\", \\"Finalizando instalación · esperando procesos hijos · \\" + seconds + \\" s\\", progress);\n"
+        "        if (seconds == 0 || seconds % 5 == 0) ConsoleLogStore.append(\\"INFO\\", \\"SteamSetup padre terminó; manteniendo Wine activo · \\" + seconds + \\" s\\");\n"
+        "        getWindow().getDecorView().postDelayed(() -> waitForDroidDeckSteamInstaller(parentStatus, waitStartedAt), 1000L);\n"
+        "    }\n\n"
+        "    private File findDroidDeckSteamExecutable() {\n"
+        "        if (container == null) return null;\n"
+        "        File driveC = new File(container.getRootDir(), \\".wine/drive_c\\");\n"
+        "        String[] paths = {\n"
+        "                \\"Steam/steam.exe\\",\n"
+        "                \\"Program Files (x86)/Steam/steam.exe\\",\n"
+        "                \\"Program Files/Steam/steam.exe\\",\n"
+        "                \\"users/xuser/AppData/Local/Steam/steam.exe\\"\n"
+        "        };\n"
+        "        for (String path : paths) {\n"
+        "            File file = new File(driveC, path);\n"
+        "            if (file.isFile()) return file;\n"
+        "        }\n"
+        "        return findDroidDeckSteamRecursive(driveC, 0);\n"
+        "    }\n\n"
+        "    private File findDroidDeckSteamRecursive(File dir, int depth) {\n"
+        "        if (dir == null || !dir.isDirectory() || depth > 7) return null;\n"
+        "        if (\\"windows\\".equalsIgnoreCase(dir.getName())) return null;\n"
+        "        File[] children = dir.listFiles();\n"
+        "        if (children == null) return null;\n"
+        "        for (File child : children) {\n"
+        "            if (child.isFile() && \\"steam.exe\\".equalsIgnoreCase(child.getName())) return child;\n"
+        "        }\n"
+        "        for (File child : children) {\n"
+        "            if (child.isDirectory()) {\n"
+        "                File found = findDroidDeckSteamRecursive(child, depth + 1);\n"
+        "                if (found != null) return found;\n"
+        "            }\n"
+        "        }\n"
+        "        return null;\n"
+        "    }\n\n"
+        "    private void finishDroidDeckRuntime(int status) {\n"
+        "        if (droidDeckSteamWatchdog != null) {\n"
+        "            droidDeckSteamWatchdog.stop();\n"
+        "            droidDeckSteamWatchdog = null;\n"
+        "        }\n"
+        "        if (droidDeckRuntimeOverlay != null) {\n"
+        "            droidDeckRuntimeOverlay.close();\n"
+        "            droidDeckRuntimeOverlay = null;\n"
+        "        }\n"
+        "        Intent result = new Intent();\n"
+        "        result.putExtra(\\"droiddeck_runtime_exit_status\\", status);\n"
+        "        result.putExtra(\\"droiddeck_runtime_purpose\\", getIntent().getStringExtra(\\"droiddeck_purpose\\"));\n"
+        "        setResult(Activity.RESULT_OK, result);\n"
+        "        finish();\n"
+        "    }\n\n"
+    )
+    if installer_anchor not in xtext:
+        raise SystemExit("ancla instalador DroidDeck no encontrada")
+    xtext = xtext.replace(installer_anchor, installer_methods + installer_anchor)
 
 # DroidDeck runtime telemetry: hide Winlator preloaders and expose real milestones.
 xtext = xtext.replace(
@@ -408,5 +484,5 @@ nutext = nutext.replace('"Winlator Foreground Service"', '"DroidDeck en segundo 
 nutext = nutext.replace('"Allows to display Winlator foreground notifications"', '"Mantiene Steam y el motor de DroidDeck activos en segundo plano"')
 notification_utils.write_text(nutext, encoding="utf-8")
 
-print("Overlay DroidDeck M6 aplicado.")
+print("Overlay DroidDeck M7 aplicado.")
 print("Base esperada:", EXPECTED_SHA)
