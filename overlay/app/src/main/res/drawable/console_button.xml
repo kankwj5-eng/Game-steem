@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_enabled="false">
+        <shape><solid android:color="#3A52639B"/><corners android:radius="18dp"/></shape>
+    </item>
+    <item android:state_pressed="true">
+        <shape><gradient android:angle="0" android:startColor="#5C68DF" android:endColor="#8056D8"/><corners android:radius="18dp"/></shape>
+    </item>
+    <item>
+        <shape><gradient android:angle="0" android:startColor="#6B78FF" android:endColor="#986CFF"/><corners android:radius="18dp"/></shape>
+    </item>
+</selector>
