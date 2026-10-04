@@ -23,7 +23,7 @@ public final class ConsoleLogStore {
     private static final int MAX_SESSION_FILES = 8;
     private static final int FILE_LOG_FLUSH_BATCH = 32;
     private static final long FILE_LOG_FLUSH_MS = 750L;
-    private static final long UI_NOTIFY_INTERVAL_MS = 120L;
+    private static final long UI_NOTIFY_INTERVAL_MS = 250L;
 
     private static final Deque<String> lines = new ArrayDeque<>(MAX_LINES + 1);
     private static final CopyOnWriteArrayList<Listener> listeners = new CopyOnWriteArrayList<>();
@@ -103,7 +103,7 @@ public final class ConsoleLogStore {
             sessionWriter.write(line);
             sessionWriter.newLine();
 
-            boolean highVolume = "FILE".equals(level) || "PKG".equals(level);
+            boolean highVolume = "FILE".equals(level) || "PKG".equals(level) || "RUNTIME".equals(level);
             if (highVolume) bufferedFileLines++;
 
             long now = SystemClock.elapsedRealtime();
