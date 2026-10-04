@@ -2,6 +2,7 @@
 """Copy only the locked public-domain C decoder into an effective source tree."""
 import hashlib
 import json
+import re
 from pathlib import Path
 import sys
 import tarfile
@@ -14,6 +15,9 @@ SOURCES = "Bcj2 Bra Bra86 BraIA64 CpuArch Delta Lzma2Dec LzmaDec Ppmd7 Ppmd7Dec 
 
 def prepare(source_root, archive_path=None):
     spec = json.loads((ROOT / "native-dependencies.lock").read_text())["sevenzip"]
+    commit = spec["commit"]
+    if not re.fullmatch(r"[0-9a-f]{40}", commit) or spec["url"] != "https://api.github.com/repos/ip7z/7zip/tarball/" + commit:
+        raise RuntimeError("Fuente SDK fuera del repositorio HTTPS fijado")
     destination = Path(source_root) / "app/src/main/cpp/steamarchive/third_party/lzma_sdk"
     receipt = destination / "SOURCE_SHA256"
     if receipt.is_file() and receipt.read_text().strip() == spec["sha256"]:
@@ -21,7 +25,8 @@ def prepare(source_root, archive_path=None):
     with tempfile.TemporaryDirectory(prefix="droiddeck-sdk-") as directory:
         archive = Path(archive_path) if archive_path else Path(directory) / "sdk.tar.gz"
         if archive_path is None:
-            urllib.request.urlretrieve(spec["url"], archive)
+            # URL must match the fixed HTTPS host/repository/hex commit above; SHA is checked below.
+            urllib.request.urlretrieve(spec["url"], archive)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
         with archive.open("rb") as stream:
             digest = hashlib.file_digest(stream, "sha256").hexdigest()
         if digest != spec["sha256"]:

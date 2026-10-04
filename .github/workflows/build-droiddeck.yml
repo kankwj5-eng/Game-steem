@@ -509,6 +509,9 @@ jobs:
             --enable=warning,performance,portability \
             --inconclusive \
             --std=c++17 \
+            --std=c11 \
+            -Iwinlator-app/app/src/main/cpp/steamarchive/third_party/lzma_sdk/C \
+            -D__AARCH64EL__ \
             -DPIPE_OS_ANDROID \
             -D__ANDROID__ \
             -D__aarch64__ \
