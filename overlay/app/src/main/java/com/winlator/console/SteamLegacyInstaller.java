@@ -30,7 +30,8 @@ public final class SteamLegacyInstaller {
             "https://github.com/brunodev85/winlator-addons/releases/download/v1.0.0/steam-legacy.7z";
 
     // Se completa con el digest verificado por el job steam_contract antes de la entrega final.
-    public static final String EXPECTED_SHA256 = "f5771fed575afb8ef8a133ee28e34a6b4191a366943d0ff7505eab3846b3d19c";\n    private static final int HTTP_RANGE_NOT_SATISFIABLE = 416;
+    public static final String EXPECTED_SHA256 = "f5771fed575afb8ef8a133ee28e34a6b4191a366943d0ff7505eab3846b3d19c";
+    private static final int HTTP_RANGE_NOT_SATISFIABLE = 416;
 
     public enum Phase {
         IDLE,
