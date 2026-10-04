@@ -3,6 +3,11 @@ package com.winlator.console;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
+import android.system.Os;
+import android.system.OsConstants;
+import android.system.ErrnoException;
+
+import java.io.FileDescriptor;
 
 import com.winlator.container.Container;
 import com.winlator.core.FileUtils;
@@ -134,6 +139,7 @@ public final class SteamLegacyInstaller {
             File previousSteam = new File(targetRoot, ".droiddeck-steam-previous");
             SteamInstallation.recover(steamExe.getParentFile(), stagedSteam, previousSteam,
                     ASSET_URL, EXPECTED_SHA256);
+            if (targetRoot.isDirectory()) syncDirectory(targetRoot);
             if (isInstalled(steamExe.getParentFile())) {
                 publish(Phase.READY, "Steam ya está instalado", 100, steamExe.length(), steamExe.length(), "C:\\Program Files (x86)\\Steam\\steam.exe");
                 ConsoleLogStore.ok("Steam ya estaba instalado: " + steamExe.getAbsolutePath());
@@ -209,11 +215,14 @@ public final class SteamLegacyInstaller {
             }
             ConsoleLogStore.info("RECUPERACIÓN · extrayendo copia verificada sin borrar Steam anterior");
             extractArchive(archive, stagingRoot, index);
+            syncDirectories(stagingRoot);
             publish(Phase.FINALIZING, "Verificando y activando instalación", 98,
                     index.uncompressedBytes, index.uncompressedBytes, "Steam/steam.exe");
             SteamInstallation.writeReceipt(stagedSteam, ASSET_URL, sha256);
+            syncDirectory(stagedSteam);
             SteamInstallation.promote(steamExe.getParentFile(), stagedSteam, previousSteam,
                     ASSET_URL, EXPECTED_SHA256);
+            syncDirectory(targetRoot);
             if (!isInstalled(steamExe.getParentFile())) {
                 throw new IllegalStateException("La instalación final no está completa");
             }
@@ -247,6 +256,20 @@ public final class SteamLegacyInstaller {
             running.set(false);
             ForegroundService.stopInstallerSession(context);
         }
+    }
+
+    // Persist directory entries too: fsync(payload) alone does not persist renamed paths.
+    private static void syncDirectories(File directory) throws Exception {
+        File[] children = directory.listFiles();
+        if (children == null) throw new IllegalStateException("No se pudo verificar " + directory.getName());
+        for (File child : children) if (child.isDirectory()) syncDirectories(child);
+        syncDirectory(directory);
+    }
+
+    private static void syncDirectory(File directory) throws ErrnoException {
+        FileDescriptor descriptor = Os.open(directory.getAbsolutePath(), OsConstants.O_RDONLY | OsConstants.O_DIRECTORY, 0);
+        try { Os.fsync(descriptor); }
+        finally { Os.close(descriptor); }
     }
 
     private static void downloadWithRetry(File partial, File archive) throws Exception {
