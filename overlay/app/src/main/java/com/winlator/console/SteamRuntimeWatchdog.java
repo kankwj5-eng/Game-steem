@@ -6,7 +6,6 @@ import android.os.Looper;
 
 import com.winlator.XServerDisplayActivity;
 import com.winlator.container.Container;
-import com.winlator.core.Callback;
 import com.winlator.core.ProcessHelper;
 import com.winlator.winhandler.OnGetProcessInfoListener;
 import com.winlator.winhandler.ProcessInfo;
@@ -39,6 +38,7 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
 
     private volatile boolean running;
     private volatile boolean fileScanRunning;
+    private volatile boolean processScanRunning;
     private volatile boolean winHandlerResponded;
     private volatile long lastActivityAt;
     private long startedAt;
@@ -55,25 +55,12 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
     private long previousFileBytes = -1L;
     private long previousNewestMtime;
     private long previousFileSampleAt;
-    private double fileWriteRate;
+    private volatile double fileWriteRate;
 
-    private String linuxProcessSummary = "[sin datos]";
-    private int linuxProcessCount;
+    private volatile String linuxProcessSummary = "[sin datos]";
+    private volatile int linuxProcessCount;
     private String lastLinuxProcessSignature = "";
     private String lastWindowsProcessSignature = "";
-
-    private final Callback<String> runtimeDebugCallback = line -> {
-        if (!running || line == null) return;
-        String trimmed = line.trim();
-        if (trimmed.isEmpty()) return;
-        String lower = trimmed.toLowerCase(Locale.US);
-        if (lower.contains("steam") || lower.contains("wine") || lower.contains("box64")
-                || lower.contains("err:") || lower.contains("error") || lower.contains("warn")
-                || lower.contains("fail") || lower.contains("cef")) {
-            if (trimmed.length() > 600) trimmed = trimmed.substring(0, 600) + "…";
-            ConsoleLogStore.append("RUNTIME", trimmed);
-        }
-    };
 
     private final Runnable ticker = new Runnable() {
         @Override
@@ -84,7 +71,14 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
             sampleNetwork(now);
             if (now - lastProcessScanAt >= PROCESS_SCAN_MS) {
                 lastProcessScanAt = now;
-                sampleLinuxProcesses();
+                if (!processScanRunning) {
+                    processScanRunning = true;
+                    fileScanner.execute(() -> {
+                        try { if (running) sampleLinuxProcesses(); }
+                        catch (Exception error) { ConsoleLogStore.warn("Monitor de procesos: " + error.getMessage()); }
+                        finally { processScanRunning = false; }
+                    });
+                }
                 winHandler.listProcesses();
             }
             scheduleFileScan(now);
@@ -113,7 +107,6 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
         lastRxSampleAt = startedAt;
 
         winHandler.setOnGetProcessInfoListener(this);
-        ProcessHelper.addDebugCallback(runtimeDebugCallback);
 
         ConsoleLogStore.info("WATCHDOG iniciado · propósito=" + purpose + " · procesos cada " + PROCESS_SCAN_MS + " ms · archivos cada " + FILE_SCAN_MS + " ms");
         handler.post(ticker);
@@ -129,7 +122,6 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
         if (winHandler.getOnGetProcessInfoListener() == this) {
             winHandler.setOnGetProcessInfoListener(null);
         }
-        ProcessHelper.removeDebugCallback(runtimeDebugCallback);
 
         ConsoleLogStore.info("WATCHDOG detenido.");
     }
@@ -259,16 +251,15 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
         File driveC = new File(container.getRootDir(), ".wine/drive_c");
 
         ArrayList<File> roots = new ArrayList<>();
-        addIfExists(roots, new File(driveC, "Steam"));
-        addIfExists(roots, new File(driveC, "Program Files (x86)/Steam"));
-        addIfExists(roots, new File(driveC, "Program Files/Steam"));
-        addIfExists(roots, new File(driveC, "DroidDeck"));
-
-        if (roots.isEmpty()) roots.add(driveC);
+        // Sample mutable client activity, not thousands of static assets or installed games.
+        File steam = new File(driveC, "Program Files (x86)/Steam");
+        for (String path : new String[]{"logs", "config", "userdata", "appcache", "package", "steamapps/downloading"}) {
+            addIfExists(roots, new File(steam, path));
+        }
 
         FileSnapshot snapshot = new FileSnapshot();
         snapshot.sampleStartedAt = sampleStartedAt;
-        int[] budget = {8000};
+        int[] budget = {1024};
 
         for (File root : roots) {
             scanDirectory(root, driveC, snapshot, 0, budget);

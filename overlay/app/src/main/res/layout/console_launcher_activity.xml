@@ -55,7 +55,7 @@
                 android:id="@+id/TVMode"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="AUTO"
+                android:text="STEAM"
                 android:textColor="@color/console_accent"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -237,6 +237,8 @@
             android:background="#24FFFFFF" />
 
         <LinearLayout
+            android:id="@+id/DiagnosticsHeader"
+            android:visibility="gone"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
@@ -245,7 +247,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="CONSOLA REAL"
+                android:text="REGISTRO DE ACTIVIDAD"
                 android:textColor="@color/console_text"
                 android:textSize="13sp"
                 android:textStyle="bold" />
@@ -261,7 +263,18 @@
                 android:textSize="9sp" />
         </LinearLayout>
 
+        <CheckBox
+            android:id="@+id/CBDetailedLogs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="Registro detallado en el próximo inicio"
+            android:textColor="@color/console_muted"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
         <ScrollView
+            android:visibility="gone"
             android:id="@+id/SVConsoleLog"
             android:layout_width="match_parent"
             android:layout_height="0dp"

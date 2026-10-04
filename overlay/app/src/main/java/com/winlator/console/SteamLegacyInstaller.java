@@ -530,16 +530,9 @@ public final class SteamLegacyInstaller {
     }
 
     private static boolean isUsableArchive(File archive) {
-        if (archive == null || !archive.isFile() || archive.length() < 1024L * 1024L) return false;
-        if (!hasSevenZipSignature(archive)) return false;
-        try {
-            ArchiveIndex index = indexArchive(archive);
-            return index.containsSteamExe;
-        }
-        catch (Exception error) {
-            ConsoleLogStore.warn("CACHE inválida: " + error.getMessage());
-            return false;
-        }
+        // Cheap cache probe only. The SHA gate and real archive index still run before extraction.
+        return archive != null && archive.isFile() && archive.length() == EXPECTED_ARCHIVE_BYTES
+                && hasSevenZipSignature(archive);
     }
 
     private static boolean hasSevenZipSignature(File file) {
