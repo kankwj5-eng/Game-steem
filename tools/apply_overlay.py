@@ -5,6 +5,7 @@ import sys
 import re
 
 from native_security_fixes import apply_native_security_fixes
+from prepare_7zip_sdk import prepare as prepare_7zip_sdk
 
 EXPECTED_SHA = "3981d86efa4f333b2a34a7da8b6521476cd8c8b9"
 
@@ -86,10 +87,21 @@ manifest.write_text(text, encoding="utf-8")
 
 btext = build_gradle.read_text(encoding="utf-8")
 btext = btext.replace("applicationId 'com.winlator'", "applicationId 'com.droiddeck.console'")
-btext = btext.replace('versionName "11.2"', 'versionName "1.0.0-m22"')
+btext = btext.replace("versionCode 33", "versionCode 34")
+btext = btext.replace('versionName "11.2"', 'versionName "1.0.0-m23"')
 btext = btext.replace("org.tukaani:xz:1.7", "org.tukaani:xz:1.12")
 btext = btext.replace("org.apache.commons:commons-compress:1.20", "org.apache.commons:commons-compress:1.28.0")
 build_gradle.write_text(btext, encoding="utf-8")
+
+prepare_7zip_sdk(src)
+cmake = src / "app/src/main/cpp/CMakeLists.txt"
+cmake_text = cmake.read_text()
+if "add_subdirectory(steamarchive)" not in cmake_text:
+    cmake.write_text(cmake_text + "\nadd_subdirectory(steamarchive)\n")
+proguard = src / "app/proguard-rules.pro"
+proguard.write_text(proguard.read_text() + "\n-keep interface com.winlator.console.NativeSteamArchive$Progress { *; }\n"
+        + "-keepclassmembers class * implements com.winlator.console.NativeSteamArchive$Progress { public void onProgress(...); }\n"
+        + "-keep class com.winlator.console.NativeSteamArchive { *; }\n")
 
 for strings in (src / "app/src/main/res").glob("values*/strings.xml"):
     stext = strings.read_text(encoding="utf-8")
@@ -564,5 +576,5 @@ notification_utils.write_text(nutext, encoding="utf-8")
 
 apply_native_security_fixes(src)
 
-print("Overlay DroidDeck M22 aplicado.")
+print("Overlay DroidDeck M23 aplicado.")
 print("Base esperada:", EXPECTED_SHA)

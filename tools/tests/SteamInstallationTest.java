@@ -13,6 +13,10 @@ public final class SteamInstallationTest {
     public static void main(String[] args) throws Exception {
         File root = Files.createTempDirectory("steam-recovery-").toFile();
         try {
+            String error = InstallerError.userMessage(new OutOfMemoryError("Failed to allocate a 268435472 byte allocation"));
+            check(error.contains("Memoria insuficiente") && !error.contains("268435472"), "OOM explained in Spanish");
+            check(InstallerError.userMessage(new Exception(new String(new char[500]).replace('\0', 'x'))).length() <= 180,
+                    "long errors have a bounded user-facing summary");
             File live = new File(root, "Steam");
             File stage = new File(root, "stage/Steam");
             File backup = new File(root, "previous");
