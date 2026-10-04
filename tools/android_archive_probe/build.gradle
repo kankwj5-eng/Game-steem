@@ -1,0 +1,20 @@
+plugins { id 'com.android.application' version '8.4.2' }
+android {
+    namespace 'com.winlator'
+    compileSdk 35
+    ndkVersion '24.0.8215888'
+    defaultConfig {
+        applicationId 'com.droiddeck.archiveprobe'
+        minSdk 26
+        targetSdk 28
+        ndk { abiFilters 'x86_64' }
+    }
+    externalNativeBuild { cmake {
+        version '3.22.1'
+        path '../../winlator-app/app/src/main/cpp/steamarchive/CMakeLists.txt'
+    } }
+    sourceSets.main {
+        java.srcDirs += 'generated/java'
+        res.srcDirs = ['../../overlay/app/src/main/res']
+    }
+}

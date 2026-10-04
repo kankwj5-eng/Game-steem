@@ -254,12 +254,14 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
                 currentDetail.setText(step.detail);
                 currentProgress.setProgress(step.progress);
                 currentPercent.setText(step.progress + "%");
+                currentPercent.setVisibility(step.state == BootstrapStep.State.ERROR ? View.GONE : View.VISIBLE);
             }
             else if (step.state == BootstrapStep.State.DONE && "launch".equals(step.id)) {
                 currentStage.setText("Listo");
                 currentDetail.setText(step.detail);
                 currentProgress.setProgress(100);
                 currentPercent.setText("100%");
+                currentPercent.setVisibility(View.VISIBLE);
             }
 
             if (step.state == BootstrapStep.State.ERROR) {
@@ -282,6 +284,7 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
                 currentDetail.setText("Cliente verificado · pulsa Iniciar Steam");
                 currentProgress.setProgress(100);
                 currentPercent.setText("100%");
+                currentPercent.setVisibility(View.VISIBLE);
             }
             else {
                 startButton.setEnabled(false);

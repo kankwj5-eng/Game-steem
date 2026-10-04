@@ -10,8 +10,10 @@ M21 extrae en staging, verifica los tamaños de todos los archivos y confirma el
 
 Los archivos y directorios se sincronizan antes de confirmar la instalación para reducir el riesgo por apagados. Esto añade coste a la primera extracción; el arranque habitual solo comprueba el marcador y seis binarios. Tras una instalación verificada se elimina la caché del paquete.
 
-## Rendimiento y pantalla · M22
+## Rendimiento y pantalla · M23
 
+- Extracción nativa C de 7-Zip: evita el diccionario de 256 MiB en Java que causaba el error de memoria. El paquete sólido aún necesita aproximadamente 527 MiB temporales nativos en la prueba local; se liberan al terminar. Fuente fijada en `native-dependencies.lock`.
+- Errores breves en español, porcentaje oculto al fallar y columna principal desplazable para alcanzar los botones en pantallas horizontales pequeñas.
 - Perfil Box64 de rendimiento, servicios esenciales y ahorro de memoria de Steam.
 - Wine conserva errores; los logs detallados de Wine/Box64 son opcionales desde Diagnóstico para el próximo inicio.
 - Un único observador filtrado registra mensajes runtime antes y después de la primera ventana, conservando batching y refresco a 250 ms.
@@ -29,6 +31,7 @@ El objetivo son dispositivos con al menos 4 GB de RAM. Esto no garantiza compati
 | `overlay/app/src/main/res/` | Interfaz y recursos |
 | `tools/apply_overlay.py` | Integración sobre la base fijada |
 | `tools/check_overlay.py` | Contratos y comprobaciones del overlay |
+| `overlay/app/src/main/cpp/steamarchive/` | Decoder JNI y presupuesto de memoria |
 | `tools/tests/SteamInstallationTest.java` | Escenarios de instalación interrumpida |
 | `.github/workflows/build-droiddeck.yml` | Build, firma, APK, contrato Steam y análisis |
 
@@ -42,6 +45,8 @@ bash tools/test_steam_installation.sh  # JDK 17
 bash tools/prepare_effective_source.sh
 ```
 
-Actions ejecuta los controles en PR y en main: Gradle assembleDebug, firma de desarrollo estable, inspección de package `com.droiddeck.console`, contrato real de Steam Legacy y análisis. El artefacto M22 se llama `Game-steem-DroidDeck-M22-debug.apk`.
+Actions ejecuta los controles en PR y en main: Gradle assembleDebug, firma de desarrollo estable, inspección de package `com.droiddeck.console`, contrato real de Steam Legacy, extracción con Java limitado a 64 MiB, prueba Android de JNI y pantalla pequeña, y análisis. El artefacto M23 se llama `Game-steem-DroidDeck-M23-debug.apk`.
 
 La clave de desarrollo pública permite actualizar entre builds, pero no es una clave privada de publicación. Un build verde verifica compilación y empaquetado; no sustituye una prueba de Steam y juegos en un teléfono real.
+
+La investigación de alternativas, resultados y límites de las pruebas están en [viabilidad Steam en Android](docs/viabilidad-steam-android.md).

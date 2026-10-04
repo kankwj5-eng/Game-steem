@@ -1,0 +1,8 @@
+{
+  "sevenzip": {
+    "version": "26.03",
+    "commit": "0766b733fe3e06dd2a7f9a3cfbf2108ac73abd17",
+    "url": "https://api.github.com/repos/ip7z/7zip/tarball/0766b733fe3e06dd2a7f9a3cfbf2108ac73abd17",
+    "sha256": "592d282077acb1bbc990de82bee4ae7047cb36386f2c465f02bc5c623b88f407"
+  }
+}

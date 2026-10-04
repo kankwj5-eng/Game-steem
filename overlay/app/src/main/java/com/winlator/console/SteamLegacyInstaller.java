@@ -13,9 +13,6 @@ import com.winlator.container.Container;
 import com.winlator.core.FileUtils;
 import com.winlator.services.ForegroundService;
 
-import org.apache.commons.compress.archivers.sevenz.SevenZArchiveEntry;
-import org.apache.commons.compress.archivers.sevenz.SevenZFile;
-
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -256,7 +253,7 @@ public final class SteamLegacyInstaller {
             String message = error.getMessage();
             if (message == null || message.trim().isEmpty()) message = error.getClass().getSimpleName();
             ConsoleLogStore.error("STEAM INSTALL · " + error.getClass().getSimpleName() + " · " + message);
-            publish(Phase.ERROR, message, 0, 0, 0, "");
+            publish(Phase.ERROR, InstallerError.userMessage(error), 0, 0, 0, "");
         }
         finally {
             running.set(false);
@@ -431,108 +428,27 @@ public final class SteamLegacyInstaller {
     }
 
     private static ArchiveIndex indexArchive(File archive) throws Exception {
-        publish(Phase.INDEXING, "Leyendo contenido real del paquete", 52, 0, archive.length(), "steam-legacy.7z");
-
-        long bytes = 0L;
-        int entries = 0;
-        boolean steamExe = false;
-
-        try (SevenZFile sevenZ = new SevenZFile(archive)) {
-            SevenZArchiveEntry entry;
-            while ((entry = sevenZ.getNextEntry()) != null) {
-                entries++;
-                String name = normalizeEntryName(entry.getName());
-                if (!entry.isDirectory() && entry.getSize() > 0) bytes += entry.getSize();
-                if ("steam/steam.exe".equalsIgnoreCase(name)) steamExe = true;
-
-                if (entries <= 20 || entries % 50 == 0 || name.toLowerCase(Locale.US).endsWith("steam.exe")) {
-                    ConsoleLogStore.append("PKG", "#" + entries + " · " + name
-                            + (entry.isDirectory() ? " [dir]" : " · " + formatBytes(Math.max(0L, entry.getSize()))));
-                }
-            }
-        }
-
-        return new ArchiveIndex(entries, bytes, steamExe);
+        publish(Phase.INDEXING, "Leyendo índice nativo del paquete", 52, 0, archive.length(), "steam-legacy.7z");
+        long[] metadata = NativeSteamArchive.inspect(archive.getAbsolutePath());
+        ConsoleLogStore.info("PAQUETE · bloque sólido mayor " + formatBytes(metadata[3])
+                + " · decoder nativo fuera del heap Java");
+        return new ArchiveIndex((int)metadata[0], metadata[1], metadata[2] == 1L);
     }
 
     private static void extractArchive(File archive, File targetRoot, ArchiveIndex index) throws Exception {
-        publish(Phase.EXTRACTING, "Extrayendo Steam Legacy", 55, 0, index.uncompressedBytes, "");
-
-        String canonicalRoot = targetRoot.getCanonicalPath();
-        if (!canonicalRoot.endsWith(File.separator)) canonicalRoot += File.separator;
-
-        long extracted = 0L;
-        long lastUi = 0L;
-        int fileIndex = 0;
-
-        try (SevenZFile sevenZ = new SevenZFile(archive)) {
-            SevenZArchiveEntry entry;
-            byte[] buffer = new byte[1024 * 1024];
-
-            while ((entry = sevenZ.getNextEntry()) != null) {
-                String name = normalizeEntryName(entry.getName());
-                if (name.isEmpty()) continue;
-                if (!name.equals("Steam") && !name.startsWith("Steam/")) {
-                    throw new SecurityException("Entrada fuera de Steam: " + name);
-                }
-
-                File output = new File(targetRoot, name);
-                String canonicalOutput = output.getCanonicalPath();
-                if (!canonicalOutput.equals(targetRoot.getCanonicalPath())
-                        && !canonicalOutput.startsWith(canonicalRoot)) {
-                    throw new SecurityException("Ruta insegura dentro del paquete: " + name);
-                }
-
-                if (entry.isDirectory()) {
-                    if (!output.isDirectory() && !output.mkdirs()) {
-                        throw new IllegalStateException("No se pudo crear " + name);
-                    }
-                    continue;
-                }
-
-                File parent = output.getParentFile();
-                if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-                    throw new IllegalStateException("No se pudo crear " + parent.getAbsolutePath());
-                }
-
-                fileIndex++;
-                ConsoleLogStore.append("FILE", "EXTRACT " + fileIndex + "/" + index.entries + " · " + name
-                        + " · " + formatBytes(Math.max(0L, entry.getSize())));
-
-                try (FileOutputStream out = new FileOutputStream(output, false)) {
-                    long fileBytes = 0L;
-                    int read;
-                    while ((read = sevenZ.read(buffer)) > 0) {
-                        out.write(buffer, 0, read);
-                        extracted += read;
-                        fileBytes += read;
-
-                        long now = System.currentTimeMillis();
-                        if (now - lastUi >= 150L) {
-                            lastUi = now;
-                            int rawPct = index.uncompressedBytes > 0
-                                    ? Math.min(100, (int)((100L * extracted) / index.uncompressedBytes))
-                                    : 0;
-                            int uiPct = 55 + Math.min(40, (rawPct * 40) / 100);
-                            String detail = "Extrayendo " + rawPct + "% · " + formatBytes(extracted) + " / "
-                                    + formatBytes(index.uncompressedBytes) + " · " + name;
-                            publish(Phase.EXTRACTING, detail, uiPct, extracted, index.uncompressedBytes, name);
-                        }
-                    }
-                    if (fileBytes != entry.getSize()) {
-                        throw new IllegalStateException("Archivo extraído incompleto: " + name);
-                    }
-                    // Persist all payload files before the completion receipt, including power loss.
-                    out.getFD().sync();
-                }
-            }
-        }
-
-        if (extracted != index.uncompressedBytes) {
-            throw new IllegalStateException("Extracción incompleta: " + extracted + "/" + index.uncompressedBytes);
-        }
+        publish(Phase.EXTRACTING, "Extrayendo Steam con el decoder nativo", 55, 0, index.uncompressedBytes, "");
+        long peak = NativeSteamArchive.extract(archive.getAbsolutePath(), targetRoot.getCanonicalPath(),
+                (name, files, extracted, total, nativePeak) -> {
+                    int rawPct = total > 0 ? Math.min(100, (int)(100L * extracted / total)) : 0;
+                    int uiPct = 55 + Math.min(40, rawPct * 40 / 100);
+                    publish(Phase.EXTRACTING, "Extrayendo " + rawPct + "% · " + formatBytes(extracted)
+                            + " / " + formatBytes(total) + " · " + name,
+                            uiPct, extracted, total, name);
+                    ConsoleLogStore.append("FILE", "EXTRACT " + files + "/" + index.entries + " · " + name);
+                });
         ConsoleLogStore.flush();
-        ConsoleLogStore.ok("EXTRACCIÓN COMPLETA · " + formatBytes(extracted));
+        ConsoleLogStore.ok("EXTRACCIÓN COMPLETA · " + formatBytes(index.uncompressedBytes)
+                + " · pico de asignaciones del decoder nativo " + formatBytes(peak));
     }
 
     private static boolean isUsableArchive(File archive) {
@@ -581,14 +497,6 @@ public final class SteamLegacyInstaller {
         catch (NumberFormatException ignored) {
             return -1L;
         }
-    }
-
-    private static String normalizeEntryName(String name) {
-        if (name == null) return "";
-        String value = name.replace('\\', '/');
-        while (value.startsWith("/")) value = value.substring(1);
-        while (value.startsWith("./")) value = value.substring(2);
-        return value;
     }
 
     private static void publish(Phase phase, String detail, int progress, long current, long total, String currentFile) {

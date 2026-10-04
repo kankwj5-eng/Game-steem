@@ -52,7 +52,7 @@ jobs:
       - name: Test interrupted Steam installation recovery
         run: bash tools/test_steam_installation.sh
 
-      - name: Apply DroidDeck M22 overlay
+      - name: Apply DroidDeck M23 overlay
         run: python3 tools/apply_overlay.py "$GITHUB_WORKSPACE/winlator-app"
 
       - name: Verify critical wiring
@@ -66,7 +66,7 @@ jobs:
           grep -Fq 'SteamLegacyInstaller' winlator-app/app/src/main/java/com/winlator/console/ConsoleBootstrapController.java
           grep -Fq 'Program Files (x86)/Steam/steam.exe' winlator-app/app/src/main/java/com/winlator/console/ConsoleBootstrapController.java
           grep -Fq 'steam-legacy.7z' winlator-app/app/src/main/java/com/winlator/console/SteamLegacyInstaller.java
-          grep -Fq 'SevenZFile' winlator-app/app/src/main/java/com/winlator/console/SteamLegacyInstaller.java
+          grep -Fq 'NativeSteamArchive' winlator-app/app/src/main/java/com/winlator/console/SteamLegacyInstaller.java
           grep -Fq 'startInstallerSession' winlator-app/app/src/main/java/com/winlator/services/ForegroundService.java
           grep -Fq 'FOREGROUND_SERVICE_TYPE_DATA_SYNC' winlator-app/app/src/main/java/com/winlator/services/ForegroundService.java
           ! grep -Fq 'SteamSetup.exe' winlator-app/app/src/main/java/com/winlator/console/ConsoleBootstrapController.java
@@ -122,21 +122,22 @@ jobs:
         run: |
           APK=winlator-app/app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK"
+          unzip -l "$APK" | grep -F 'lib/arm64-v8a/libsteamarchive.so'
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | tee apk-badging.txt
           grep -Fq "package: name='com.droiddeck.console'" apk-badging.txt
 
       - name: Package APK
         run: |
           mkdir -p out
-          cp winlator-app/app/build/outputs/apk/debug/app-debug.apk out/Game-steem-DroidDeck-M22-debug.apk
+          cp winlator-app/app/build/outputs/apk/debug/app-debug.apk out/Game-steem-DroidDeck-M23-debug.apk
           cp apk-badging.txt out/apk-badging.txt
           cp apk-signing.txt out/apk-signing.txt
-          sha256sum out/Game-steem-DroidDeck-M22-debug.apk | tee out/SHA256SUMS.txt
+          sha256sum out/Game-steem-DroidDeck-M23-debug.apk | tee out/SHA256SUMS.txt
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Game-steem-DroidDeck-M22
+          name: Game-steem-DroidDeck-M23
           path: out/*
           if-no-files-found: error
           retention-days: 90
@@ -186,6 +187,18 @@ jobs:
           7z l -slt steam-contract/steam-legacy.7z | tee steam-contract/listing.txt
           grep -Eiq 'Path = Steam[/\\]steam[.]exe' steam-contract/listing.txt
           echo 'Verified Steam/steam.exe inside upstream asset.' | tee steam-contract/result.txt
+
+      - name: Set up JDK 17 for native contract
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Test real native extraction with Java heap of 64 MB
+        run: |
+          set -euo pipefail
+          python3 tools/prepare_7zip_sdk.py winlator-app
+          bash tools/test_native_steam_archive.sh winlator-app steam-contract/steam-legacy.7z | tee steam-contract/native-result.txt
           rm -f steam-contract/steam-legacy.7z
 
       - name: Upload Steam contract metadata
@@ -194,6 +207,53 @@ jobs:
           name: steam-legacy-contract
           path: steam-contract/*
           if-no-files-found: error
+          retention-days: 30
+
+  android_archive:
+    name: Android native archive and small landscape
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Prepare locked source and probe
+        run: |
+          bash tools/prepare_effective_source.sh
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -path '*/bin/sdkmanager' -print | sort -V | tail -n 1)"
+          "$SDKMANAGER" "platforms;android-35" "ndk;24.0.8215888" "cmake;3.22.1"
+          mkdir -p tools/android_archive_probe/generated/java/com/winlator/console steam-contract
+          cp overlay/app/src/main/java/com/winlator/console/{NativeSteamArchive,SteamInstallation,InstallerError}.java tools/android_archive_probe/generated/java/com/winlator/console/
+          cp tools/tests/NativeSteamArchiveTest.java tools/android_archive_probe/generated/java/com/winlator/console/
+          curl -fL --retry 4 --retry-all-errors --max-time 900 https://github.com/brunodev85/winlator-addons/releases/download/v1.0.0/steam-legacy.7z -o steam-contract/steam-legacy.7z
+          echo 'f5771fed575afb8ef8a133ee28e34a6b4191a366943d0ff7505eab3846b3d19c  steam-contract/steam-legacy.7z' | sha256sum -c -
+          chmod +x winlator-app/gradlew
+          winlator-app/gradlew -p tools/android_archive_probe --no-daemon assembleDebug
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Extract real Steam package on Android
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: 35
+          arch: x86_64
+          ram-size: 4096M
+          heap-size: 192M
+          disk-size: 4096M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash tools/run_android_archive_probe.sh
+      - name: Upload Android extraction and UI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-native-archive-proof
+          path: android-probe-results/*
+          if-no-files-found: warn
           retention-days: 30
 
   semgrep:
@@ -538,6 +598,7 @@ jobs:
     needs:
       - build
       - steam_contract
+      - android_archive
       - semgrep
       - gitleaks
       - trivy
@@ -559,6 +620,7 @@ jobs:
         shell: bash
         env:
           BUILD_RESULT: ${{ needs.build.result }}
+          ANDROID_ARCHIVE_RESULT: ${{ needs.android_archive.result }}
           STEAM_CONTRACT_RESULT: ${{ needs.steam_contract.result }}
           SEMGREP_RESULT: ${{ needs.semgrep.result }}
           GITLEAKS_RESULT: ${{ needs.gitleaks.result }}
@@ -579,6 +641,7 @@ jobs:
             echo "|---|---|"
             echo "| build + CodeQL | $BUILD_RESULT |"
             echo "| Steam Legacy contract | $STEAM_CONTRACT_RESULT |"
+            echo "| Android archive + landscape | $ANDROID_ARCHIVE_RESULT |"
             echo "| Semgrep | $SEMGREP_RESULT |"
             echo "| Gitleaks | $GITLEAKS_RESULT |"
             echo "| Trivy | $TRIVY_RESULT |"
