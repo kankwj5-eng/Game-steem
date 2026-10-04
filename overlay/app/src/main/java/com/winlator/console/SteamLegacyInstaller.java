@@ -146,6 +146,14 @@ public final class SteamLegacyInstaller {
                 return;
             }
 
+            // Reclaim interrupted extraction BEFORE calculating space for the next extraction.
+            // The verified downloaded archive and any previous Steam installation stay intact.
+            if (stagingRoot.exists()) {
+                ConsoleLogStore.info("RECUPERACIÓN · liberando extracción temporal interrumpida");
+                FileUtils.delete(stagingRoot);
+                if (stagingRoot.exists()) throw new IllegalStateException("No se pudo liberar la extracción temporal");
+            }
+
             File tempDir = new File(driveC, "windows/temp");
             if (!tempDir.isDirectory() && !tempDir.mkdirs()) {
                 throw new IllegalStateException("No se pudo crear C:\\windows\\temp");
@@ -208,9 +216,7 @@ public final class SteamLegacyInstaller {
             if (!targetRoot.isDirectory() && !targetRoot.mkdirs()) {
                 throw new IllegalStateException("No se pudo preparar la carpeta de Steam");
             }
-            // Only disposable extraction staging is removed; existing Steam data is retained.
-            if (stagingRoot.exists()) FileUtils.delete(stagingRoot);
-            if (stagingRoot.exists() || !stagingRoot.mkdirs()) {
+            if (!stagingRoot.mkdirs()) {
                 throw new IllegalStateException("No se pudo preparar la extracción temporal de Steam");
             }
             ConsoleLogStore.info("RECUPERACIÓN · extrayendo copia verificada sin borrar Steam anterior");
