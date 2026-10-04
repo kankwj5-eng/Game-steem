@@ -100,7 +100,7 @@ public final class ConsoleBootstrapController {
                 .putBoolean("enable_background_wakelock", true)
                 .apply();
 
-        ConsoleLogStore.info("BOOT · DroidDeck M20 · Winlator 11.2 · instalación Steam Legacy nativa Android");
+        ConsoleLogStore.info("BOOT · DroidDeck M21 · Winlator 11.2 · instalación Steam Legacy nativa Android");
         update("system", "Sistema", "Verificando RootFS de Winlator 11.2", BootstrapStep.State.RUNNING, 5);
 
         RootFS root = RootFS.find(activity);
@@ -298,7 +298,7 @@ public final class ConsoleBootstrapController {
     }
 
     private void checkSteam(boolean autoInstall) {
-        update("steam", "Steam", "Buscando steam.exe", BootstrapStep.State.RUNNING, 5);
+        update("steam", "Steam", "Verificando instalación de Steam", BootstrapStep.State.RUNNING, 5);
 
         File steam = findSteamExecutable(steamContainer);
         if (steam != null) {
@@ -314,7 +314,7 @@ public final class ConsoleBootstrapController {
                 BootstrapStep.State.WAITING,
                 0
         );
-        ConsoleLogStore.info("STEAM · no existe C:\\Program Files (x86)\\Steam\\steam.exe");
+        ConsoleLogStore.info("STEAM · instalación ausente o incompleta en C:\\Program Files (x86)\\Steam\\steam.exe");
 
         if (autoInstall) installSteamLegacy();
     }
@@ -322,11 +322,12 @@ public final class ConsoleBootstrapController {
     private void installSteamLegacy() {
         if (steamContainer == null || SteamLegacyInstaller.isRunning()) return;
 
-        if (!hasNetwork()) {
+        boolean localRecovery = SteamLegacyInstaller.hasLocalRecovery(steamContainer);
+        if (!localRecovery && !SteamLegacyInstaller.hasLocalArchive(steamContainer) && !hasNetwork()) {
             fail("steam", "Sin conexión a Internet para descargar Steam Legacy");
             return;
         }
-        if (!hasEnoughSpace()) {
+        if (!localRecovery && !hasEnoughSpace()) {
             fail("steam", "Se necesitan al menos 1.4 GB libres para Steam Legacy (descarga + extracción + margen)");
             return;
         }
@@ -459,16 +460,9 @@ public final class ConsoleBootstrapController {
     private File findSteamExecutable(Container container) {
         if (container == null) return null;
 
-        String[] paths = {
-                ".wine/drive_c/Program Files (x86)/Steam/steam.exe",
-                ".wine/drive_c/Steam/steam.exe",
-                ".wine/drive_c/Program Files/Steam/steam.exe"
-        };
-
-        for (String path : paths) {
-            File file = new File(container.getRootDir(), path);
-            if (file.isFile() && file.length() > 256 * 1024L) return file;
-        }
+        File file = new File(container.getRootDir(),
+                ".wine/drive_c/Program Files (x86)/Steam/steam.exe");
+        if (SteamLegacyInstaller.isInstalled(file.getParentFile())) return file;
         return null;
     }
 
