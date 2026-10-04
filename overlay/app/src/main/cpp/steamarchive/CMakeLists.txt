@@ -14,7 +14,6 @@ target_compile_definitions(steamarchive PRIVATE Z7_PPMD_SUPPORT Z7_EXTRACT_ONLY 
 set_target_properties(steamarchive PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED YES)
 if(NOT ANDROID)
     find_package(JNI REQUIRED)
-    target_compile_options(steamarchive PRIVATE -O2 -Wall -Wextra)
-target_include_directories(steamarchive PRIVATE ${JNI_INCLUDE_DIRS})
+    target_include_directories(steamarchive PRIVATE ${JNI_INCLUDE_DIRS})
     target_link_libraries(steamarchive PRIVATE pthread)
 endif()
