@@ -1,57 +1,47 @@
-# Game-steem · DroidDeck M2
+# DroidDeck · Steam para Android
 
-Launcher Android de estilo consola construido sobre el motor de **Winlator 11.2**, manteniendo Wine, Box64, XServer, audio, entrada y las rutas gráficas existentes, pero ocultando la interfaz técnica al usuario normal.
+Launcher Android en español, orientado únicamente a Steam, sobre una base fijada de Winlator 11.2. Wine, Box64, XServer, audio y controladores gráficos forman el motor; la pantalla principal presenta preparación, progreso y arranque de Steam.
 
-## Objetivo
+## Instalación automática
 
-La experiencia visible debe ser simple:
+Steam Legacy procede de Winlator Addons, no de SteamSetup.exe. El paquete se valida mediante tamaño oficial y SHA-256, con reanudación HTTP Range, control de Content-Range, manejo de HTTP 416 y cuatro intentos con backoff.
 
-1. abrir DroidDeck;
-2. conceder almacenamiento cuando Android lo requiera;
-3. ver en pantalla qué se está preparando;
-4. detectar GPU y elegir la ruta gráfica automáticamente;
-5. crear el entorno Wine/Box64;
-6. descargar Steam desde el CDN oficial;
-7. instalar Steam silenciosamente;
-8. iniciar sesión en Steam y jugar.
+M21 extrae en staging, verifica los tamaños de todos los archivos y confirma el marcador `.droiddeck-source` al terminar. El marcador identifica la fuente y el SHA esperado; seis ejecutables y bibliotecas principales se comprueban antes de habilitar el arranque. Una extracción completa pendiente se activa al reiniciar. La carpeta anterior se conserva como `.droiddeck-steam-previous` (con sufijo si ya existe), por si contiene juegos o partidas; no se elimina automáticamente. Una instalación válida no se reemplaza. Los recibos válidos de M20 siguen siendo compatibles.
 
-La interfaz de Winlator queda como backend técnico y no es el launcher principal.
+Los archivos y directorios se sincronizan antes de confirmar la instalación para reducir el riesgo por apagados. Esto añade coste a la primera extracción; el arranque habitual solo comprueba el marcador y seis binarios. Tras una instalación verificada se elimina la caché del paquete.
 
-## M2
+## Rendimiento y pantalla · M22
 
-- interfaz horizontal moderna, en español y orientada a mando/táctil;
-- panel de preparación con estados, progreso y errores;
-- consola de diagnóstico que se abre automáticamente ante fallos;
-- registro persistente por sesión dentro del almacenamiento privado de la app;
-- solicitud de permisos de almacenamiento en Android 12L o inferior;
-- `requestLegacyExternalStorage` mientras la base upstream continúe en `targetSdk 28`;
-- descarga reanudable de `SteamSetup.exe`, tres intentos y validación PE `MZ`;
-- instalación silenciosa con `SteamSetup.exe /S`;
-- soporte explícito de `exec_args` añadido al lanzador Winlator;
-- re-detección y arranque automático de Steam después de instalar;
-- detección de GPU mediante `GPUHelper` y selección upstream Turnip/Vortek;
-- `save_mem_on_run_from_steam` habilitado;
-- logs Wine `warn,err,fixme` y Box64 en nivel de diagnóstico;
-- aplicación separada de Winlator original: `com.droiddeck.console`.
+- Perfil Box64 de rendimiento, servicios esenciales y ahorro de memoria de Steam.
+- Wine conserva errores; los logs detallados de Wine/Box64 son opcionales desde Diagnóstico para el próximo inicio.
+- Un único observador filtrado registra mensajes runtime antes y después de la primera ventana, conservando batching y refresco a 250 ms.
+- El monitor comprueba procesos fuera del hilo de interfaz cada dos segundos y actividad de carpetas mutables cada cinco segundos, con límite de 1.024 archivos. La telemetría de disco es una muestra, no una medición de todos los juegos.
+- La prueba de caché comprueba tamaño y firma 7z sin indexar previamente todo el paquete; SHA e índice real siguen verificándose antes de extraer.
+- Pantalla principal con estados de preparación; registro oculto hasta solicitarlo y visible automáticamente ante errores.
 
-## Base fijada
+El objetivo son dispositivos con al menos 4 GB de RAM. Esto no garantiza compatibilidad con todos los juegos ni con todas las GPU. La ruta Mali y el tiempo real de apertura de Steam necesitan validación en hardware.
 
-`brunodev85/winlator-app`
+## Organización
 
-Commit:
+| Ruta | Responsabilidad |
+|---|---|
+| `overlay/app/src/main/java/com/winlator/console/` | Bootstrap, instalación, recuperación, monitor y logs |
+| `overlay/app/src/main/res/` | Interfaz y recursos |
+| `tools/apply_overlay.py` | Integración sobre la base fijada |
+| `tools/check_overlay.py` | Contratos y comprobaciones del overlay |
+| `tools/tests/SteamInstallationTest.java` | Escenarios de instalación interrumpida |
+| `.github/workflows/build-droiddeck.yml` | Build, firma, APK, contrato Steam y análisis |
 
-`3981d86efa4f333b2a34a7da8b6521476cd8c8b9`
+## Base y validación
 
-No se sigue `main` automáticamente: actualizar Winlator requiere una auditoría explícita del overlay.
+Base: `brunodev85/winlator-app`, commit `3981d86efa4f333b2a34a7da8b6521476cd8c8b9`. Actualizar la base requiere auditar el overlay.
 
-## Compilación
+```sh
+python3 tools/check_overlay.py
+bash tools/test_steam_installation.sh  # JDK 17
+bash tools/prepare_effective_source.sh
+```
 
-GitHub Actions ejecuta `.github/workflows/build-droiddeck.yml` en cada push a `main` y también manualmente. El artefacto esperado es:
+Actions ejecuta los controles en PR y en main: Gradle assembleDebug, firma de desarrollo estable, inspección de package `com.droiddeck.console`, contrato real de Steam Legacy y análisis. El artefacto M22 se llama `Game-steem-DroidDeck-M22-debug.apk`.
 
-`Game-steem-DroidDeck-M2-debug.apk`
-
-El workflow valida además que el APK final tenga el package `com.droiddeck.console`.
-
-## Estado
-
-M2 es una compilación de integración. Hasta instalar el APK en hardware real Mali y ejecutar Steam no se considera una versión estable. Los fallos de compilación y de runtime deben conservarse porque alimentan la siguiente ronda de correcciones.
+La clave de desarrollo pública permite actualizar entre builds, pero no es una clave privada de publicación. Un build verde verifica compilación y empaquetado; no sustituye una prueba de Steam y juegos en un teléfono real.

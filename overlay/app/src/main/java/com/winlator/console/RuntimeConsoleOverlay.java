@@ -118,7 +118,7 @@ public final class RuntimeConsoleOverlay implements ConsoleLogStore.Listener {
 
             telemetry.setText(
                     "RED    " + networkRate + "   ·   sesión " + networkTotal + "\n" +
-                    "DISCO  " + diskRate + "   ·   " + fileCount + " archivos / " + diskTotal + "\n" +
+                    "DISCO (muestra)  " + diskRate + "   ·   " + fileCount + " archivos / " + diskTotal + "\n" +
                     "ÚLTIMO " + safeFile + "\n" +
                     "PROC   Windows " + windowsProcessCount +
                     " · Linux/Box64 " + linuxProcessCount +

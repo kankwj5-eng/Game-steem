@@ -86,7 +86,7 @@ manifest.write_text(text, encoding="utf-8")
 
 btext = build_gradle.read_text(encoding="utf-8")
 btext = btext.replace("applicationId 'com.winlator'", "applicationId 'com.droiddeck.console'")
-btext = btext.replace('versionName "11.2"', 'versionName "1.0.0-m21"')
+btext = btext.replace('versionName "11.2"', 'versionName "1.0.0-m22"')
 btext = btext.replace("org.tukaani:xz:1.7", "org.tukaani:xz:1.12")
 btext = btext.replace("org.apache.commons:commons-compress:1.20", "org.apache.commons:commons-compress:1.28.0")
 build_gradle.write_text(btext, encoding="utf-8")
@@ -173,12 +173,12 @@ if 'droidDeckConsoleMode = getIntent().getBooleanExtra("droiddeck_console", fals
         "ForegroundService.startSession(this);",
         "ForegroundService.startSession(this);\n        droidDeckConsoleMode = getIntent().getBooleanExtra(\"droiddeck_console\", false);\n        if (droidDeckConsoleMode) {\n            ConsoleLogStore.initialize(this);\n            droidDeckRuntimeOverlay = new RuntimeConsoleOverlay(this);\n            droidDeckRuntimeOverlay.stage(\"Motor\", \"Validando contenedor y prefijo\", 6);\n        }"
     )
-if 'ConsoleLogStore.append("RUNTIME", line)' not in xtext:
-    xtext = xtext.replace(
-        "if (enableLogs) ProcessHelper.addDebugCallback(debugDialog = new DebugDialog(this));",
-        "if (enableLogs) ProcessHelper.addDebugCallback(debugDialog = new DebugDialog(this));\n"
-        "        if (droidDeckConsoleMode) ProcessHelper.addDebugCallback(line -> ConsoleLogStore.append(\"RUNTIME\", line));"
-    )
+# DroidDeck's watchdog owns runtime logging. Avoid a second full log and hidden DebugDialog.
+xtext = xtext.replace(
+    "if (enableLogs) ProcessHelper.addDebugCallback(debugDialog = new DebugDialog(this));",
+    "if (enableLogs && !droidDeckConsoleMode) ProcessHelper.addDebugCallback(debugDialog = new DebugDialog(this));\n"
+    "        if (droidDeckConsoleMode) ProcessHelper.addDebugCallback(ConsoleLogStore.RUNTIME_CALLBACK);"
+)
 if "navigationView.setVisibility(droidDeckConsoleMode ? View.GONE : View.VISIBLE);" not in xtext:
     xtext = xtext.replace(
         "NavigationView navigationView = findViewById(R.id.NavigationView);",
@@ -505,6 +505,8 @@ xtext = xtext.replace(
     "    protected void onDestroy() {\n"
     "        winHandler.stop();",
     "    protected void onDestroy() {\n"
+    "        ProcessHelper.removeDebugCallback(ConsoleLogStore.RUNTIME_CALLBACK);\n"
+    "        ConsoleLogStore.flush();\n"
     "        if (droidDeckSteamWatchdog != null) {\n"
     "            droidDeckSteamWatchdog.stop();\n"
     "            droidDeckSteamWatchdog = null;\n"
@@ -562,5 +564,5 @@ notification_utils.write_text(nutext, encoding="utf-8")
 
 apply_native_security_fixes(src)
 
-print("Overlay DroidDeck M21 aplicado.")
+print("Overlay DroidDeck M22 aplicado.")
 print("Base esperada:", EXPECTED_SHA)

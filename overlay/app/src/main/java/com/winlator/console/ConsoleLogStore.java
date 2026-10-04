@@ -5,6 +5,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 
+import com.winlator.core.Callback;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -17,6 +19,20 @@ import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public final class ConsoleLogStore {
+    // One callback for the complete runtime lifetime, including errors before/after the first window.
+    public static final Callback<String> RUNTIME_CALLBACK = line -> {
+        if (line == null) return;
+        String trimmed = line.trim();
+        if (trimmed.isEmpty()) return;
+        String lower = trimmed.toLowerCase(Locale.US);
+        if (lower.contains("steam") || lower.contains("wine") || lower.contains("box64")
+                || lower.contains("err:") || lower.contains("error") || lower.contains("warn")
+                || lower.contains("fail") || lower.contains("cef")) {
+            if (trimmed.length() > 600) trimmed = trimmed.substring(0, 600) + "…";
+            append("RUNTIME", trimmed);
+        }
+    };
+
     public interface Listener { void onLogChanged(String fullLog); }
 
     private static final int MAX_LINES = 900;

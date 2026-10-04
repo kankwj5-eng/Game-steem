@@ -45,14 +45,17 @@ for token in [
     "retry()",
     "Box64",
     "installSteamLegacy",
-    "BOOT · DroidDeck M21 ·",
+    "droiddeck_detailed_logs",
+    'detailed ? "warn,err,fixme" : "err"',
+    'detailed ? 1 : 0',
+    "BOOT · DroidDeck M22 ·",
     "1400L * 1024L * 1024L",
     "1.4 GB libres",
 ]:
     if token not in controller:
-        raise SystemExit(f"controlador M21 incompleto: falta {token}")
+        raise SystemExit(f"controlador M22 incompleto: falta {token}")
 
-# M21 must not regress to hidden Windows installers.
+# M22 must not regress to hidden Windows installers.
 for forbidden in [
     "SteamSetup.exe",
     "steam_install",
@@ -61,7 +64,7 @@ for forbidden in [
     "waitForSteamAfterInstall",
 ]:
     if forbidden in controller:
-        raise SystemExit(f"controlador M21 conserva ruta antigua prohibida: {forbidden}")
+        raise SystemExit(f"controlador M22 conserva ruta antigua prohibida: {forbidden}")
 
 installer = (root / "overlay/app/src/main/java/com/winlator/console/SteamLegacyInstaller.java").read_text()
 for token in [
@@ -119,7 +122,7 @@ for token in [
     "sessionActive.get() || installerActive.get()",
 ]:
     if token not in foreground:
-        raise SystemExit(f"ForegroundService M21 incompleto: falta {token}")
+        raise SystemExit(f"ForegroundService M22 incompleto: falta {token}")
 
 activity = (root / "overlay/app/src/main/java/com/winlator/ConsoleLauncherActivity.java").read_text()
 for token in [
@@ -128,6 +131,9 @@ for token in [
     "TVCurrentPercent",
     "StepPermissionsStatus",
     "controller.destroy()",
+    "setDiagnosticsVisible",
+    "CBDetailedLogs",
+    "ConsoleLogStore.snapshot()",
 ]:
     if token not in activity:
         raise SystemExit(f"launcher incompleto: falta {token}")
@@ -141,9 +147,12 @@ for token in [
     "fileWriteRate",
     "FILE_SCAN_MS = 5000L",
     "previousFileSampleAt",
-    "int[] budget = {8000}",
+    "int[] budget = {1024}",
     "PROCESS_SCAN_MS = 2000L",
     "lastProcessScanAt",
+    "steamapps/downloading",
+    "processScanRunning",
+    "if (running) sampleLinuxProcesses()",
     "now - lastProcessScanAt >= PROCESS_SCAN_MS",
 ]:
     if token not in watchdog:
@@ -165,6 +174,7 @@ for token in [
 console_log = (root / "overlay/app/src/main/java/com/winlator/console/ConsoleLogStore.java").read_text()
 for token in [
     "BufferedWriter",
+    "RUNTIME_CALLBACK",
     "ArrayDeque",
     "UI_NOTIFY_INTERVAL_MS",
     "FILE_LOG_FLUSH_BATCH",
@@ -177,7 +187,7 @@ for token in [
     "\"RUNTIME\".equals(level)",
 ]:
     if token not in console_log:
-        raise SystemExit(f"log M21 no optimizado: falta {token}")
+        raise SystemExit(f"log M22 no optimizado: falta {token}")
 
 security_fixes = (root / "tools/native_security_fixes.py").read_text()
 for token in [
@@ -198,7 +208,7 @@ patcher = (root / "tools/apply_overlay.py").read_text()
 for token in [
     "/data/data/com.droiddeck.console/",
     "runOnUiThread",
-    'versionName "1.0.0-m21"',
+    'versionName "1.0.0-m22"',
     "SteamRuntimeWatchdog",
     "droidDeckSteamWatchdog = new SteamRuntimeWatchdog",
     'android:label="DroidDeck"',
@@ -213,15 +223,18 @@ for token in [
     "FOREGROUND_SERVICE_DATA_SYNC",
     'android:foregroundServiceType="mediaPlayback|dataSync"',
     "commons-compress:1.28.0",
+    "enableLogs && !droidDeckConsoleMode",
+    "ProcessHelper.addDebugCallback(ConsoleLogStore.RUNTIME_CALLBACK)",
+    "ProcessHelper.removeDebugCallback(ConsoleLogStore.RUNTIME_CALLBACK)",
     "xz:1.12",
 ]:
     if token not in patcher:
-        raise SystemExit(f"parche M21 incompleto: falta {token}")
+        raise SystemExit(f"parche M22 incompleto: falta {token}")
 
 launcher_xml = (root / "overlay/app/src/main/res/layout/console_launcher_activity.xml").read_text()
 runtime_xml = (root / "overlay/app/src/main/res/layout/droiddeck_runtime_overlay.xml").read_text()
 for token in ['@drawable/ic_droiddeck_logo', 'DROIDDECK']:
     if token not in launcher_xml or token not in runtime_xml:
-        raise SystemExit(f"branding M21 incompleto: falta {token}")
+        raise SystemExit(f"branding M22 incompleto: falta {token}")
 
-print("Overlay M21 válido: instalación Steam Legacy nativa, telemetría y seguridad integradas.")
+print("Overlay M22 válido: instalación Steam Legacy nativa, telemetría y seguridad integradas.")

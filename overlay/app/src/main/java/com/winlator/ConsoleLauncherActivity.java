@@ -8,6 +8,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
+import androidx.preference.PreferenceManager;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -45,6 +47,8 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
     private TextView logPath;
     private ScrollView logScroll;
     private View errorActions;
+    private View diagnosticsHeader;
+    private CheckBox detailedLogs;
     private boolean permissionsBlocked;
 
     @Override
@@ -72,9 +76,15 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
         logPath = findViewById(R.id.TVLogPath);
         logScroll = findViewById(R.id.SVConsoleLog);
         errorActions = findViewById(R.id.ErrorActions);
+        diagnosticsHeader = findViewById(R.id.DiagnosticsHeader);
+        detailedLogs = findViewById(R.id.CBDetailedLogs);
+        detailedLogs.setChecked(PreferenceManager.getDefaultSharedPreferences(this)
+                .getBoolean("droiddeck_detailed_logs", false));
+        detailedLogs.setOnCheckedChangeListener((button, checked) ->
+                PreferenceManager.getDefaultSharedPreferences(this).edit()
+                        .putBoolean("droiddeck_detailed_logs", checked).apply());
 
         ConsoleLogStore.initialize(this);
-        ConsoleLogStore.addListener(this);
         logPath.setText(ConsoleLogStore.getSessionFilePath());
 
         controller = new ConsoleBootstrapController(this, this);
@@ -86,8 +96,7 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
         });
 
         findViewById(R.id.BTDiagnostics).setOnClickListener(v -> {
-            logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
-            ConsoleLogStore.info("Diagnóstico visible en la mitad derecha.");
+            setDiagnosticsVisible(logScroll.getVisibility() != View.VISIBLE);
         });
 
         findViewById(R.id.BTCloseDiagnostics).setOnClickListener(v -> errorActions.setVisibility(View.GONE));
@@ -269,6 +278,10 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
                 startButton.setEnabled(true);
                 startButton.setText("INICIAR STEAM");
                 steamState.setText("Steam está listo");
+                currentStage.setText("Todo listo");
+                currentDetail.setText("Cliente verificado · pulsa Iniciar Steam");
+                currentProgress.setProgress(100);
+                currentPercent.setText("100%");
             }
             else {
                 startButton.setEnabled(false);
@@ -286,12 +299,27 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
     @Override
     public void onLogChanged(String fullLog) {
         runOnUiThread(() -> {
+            if (logScroll.getVisibility() != View.VISIBLE) return;
             logView.setText(fullLog.isEmpty() ? "Esperando actividad…" : fullLog);
             logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
         });
     }
 
+    private void setDiagnosticsVisible(boolean visible) {
+        int visibility = visible ? View.VISIBLE : View.GONE;
+        diagnosticsHeader.setVisibility(visibility);
+        detailedLogs.setVisibility(visibility);
+        logScroll.setVisibility(visibility);
+        ((Button)findViewById(R.id.BTDiagnostics)).setText(visible ? "OCULTAR REGISTRO" : "DIAGNÓSTICO");
+        if (visible) {
+            ConsoleLogStore.addListener(this);
+            onLogChanged(ConsoleLogStore.snapshot());
+        }
+        else ConsoleLogStore.removeListener(this);
+    }
+
     private void showErrorActions() {
+        setDiagnosticsVisible(true);
         errorActions.setVisibility(View.VISIBLE);
         logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
     }

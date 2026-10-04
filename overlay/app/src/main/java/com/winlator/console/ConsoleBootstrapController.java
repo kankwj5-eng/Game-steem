@@ -93,14 +93,13 @@ public final class ConsoleBootstrapController {
         prefs.edit()
                 .putBoolean("save_mem_on_run_from_steam", true)
                 .putBoolean("use_android_clipboard_on_wine", true)
-                .putBoolean("enable_wine_debug", true)
-                .putString("wine_debug_channels", "warn,err,fixme")
-                .putInt("box64_logs", 1)
                 .putBoolean("enable_background_protection", true)
                 .putBoolean("enable_background_wakelock", true)
                 .apply();
 
-        ConsoleLogStore.info("BOOT · DroidDeck M21 · Winlator 11.2 · instalación Steam Legacy nativa Android");
+        configureRuntimeLogging();
+
+        ConsoleLogStore.info("BOOT · DroidDeck M22 · Winlator 11.2 · instalación Steam Legacy nativa Android");
         update("system", "Sistema", "Verificando RootFS de Winlator 11.2", BootstrapStep.State.RUNNING, 5);
 
         RootFS root = RootFS.find(activity);
@@ -403,6 +402,16 @@ public final class ConsoleBootstrapController {
         listener.onReady(true);
     }
 
+    private void configureRuntimeLogging() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(activity);
+        boolean detailed = prefs.getBoolean("droiddeck_detailed_logs", false);
+        prefs.edit().putBoolean("enable_wine_debug", true)
+                .putString("wine_debug_channels", detailed ? "warn,err,fixme" : "err")
+                .putInt("box64_logs", detailed ? 1 : 0).apply();
+        ConsoleLogStore.info(detailed ? "DIAGNÓSTICO · registro detallado activo"
+                : "RENDIMIENTO · registro de errores; diagnóstico detallado desactivado");
+    }
+
     private void launchSteam(File steam) {
         if (steam == null || !steam.isFile()) {
             fail("launch", "steam.exe desapareció antes de arrancar");
@@ -420,6 +429,7 @@ public final class ConsoleBootstrapController {
         ConsoleLogStore.info("LAUNCH · steam.exe: " + steam.getAbsolutePath());
         ConsoleLogStore.info("LAUNCH · Box64 aplicará el bloque [steam.exe] de default.box64rc.");
 
+        configureRuntimeLogging();
         Intent intent = new Intent(activity, XServerDisplayActivity.class);
         intent.putExtra("container_id", steamContainer.id);
         intent.putExtra("exec_path", steam.getAbsolutePath());

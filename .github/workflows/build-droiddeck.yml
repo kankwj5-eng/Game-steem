@@ -52,7 +52,7 @@ jobs:
       - name: Test interrupted Steam installation recovery
         run: bash tools/test_steam_installation.sh
 
-      - name: Apply DroidDeck M21 overlay
+      - name: Apply DroidDeck M22 overlay
         run: python3 tools/apply_overlay.py "$GITHUB_WORKSPACE/winlator-app"
 
       - name: Verify critical wiring
@@ -128,15 +128,15 @@ jobs:
       - name: Package APK
         run: |
           mkdir -p out
-          cp winlator-app/app/build/outputs/apk/debug/app-debug.apk out/Game-steem-DroidDeck-M21-debug.apk
+          cp winlator-app/app/build/outputs/apk/debug/app-debug.apk out/Game-steem-DroidDeck-M22-debug.apk
           cp apk-badging.txt out/apk-badging.txt
           cp apk-signing.txt out/apk-signing.txt
-          sha256sum out/Game-steem-DroidDeck-M21-debug.apk | tee out/SHA256SUMS.txt
+          sha256sum out/Game-steem-DroidDeck-M22-debug.apk | tee out/SHA256SUMS.txt
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Game-steem-DroidDeck-M21
+          name: Game-steem-DroidDeck-M22
           path: out/*
           if-no-files-found: error
           retention-days: 90
@@ -168,6 +168,19 @@ jobs:
           echo "$URL" | tee steam-contract/source-url.txt
           curl -fL --retry 4 --retry-delay 2 --retry-all-errors --connect-timeout 20 --max-time 900 "$URL" -o steam-contract/steam-legacy.7z
           test -s steam-contract/steam-legacy.7z
+          python3 - <<'PY'
+          import hashlib
+          import re
+          from pathlib import Path
+          source = Path("overlay/app/src/main/java/com/winlator/console/SteamLegacyInstaller.java").read_text()
+          expected_sha = re.search(r'EXPECTED_SHA256 = "([a-f0-9]{64})"', source).group(1)
+          expected_size = int(re.search(r'EXPECTED_ARCHIVE_BYTES = ([0-9_]+)L', source).group(1).replace("_", ""))
+          archive = Path("steam-contract/steam-legacy.7z")
+          assert archive.stat().st_size == expected_size, "Steam Legacy size changed"
+          with archive.open("rb") as stream:
+              assert hashlib.file_digest(stream, "sha256").hexdigest() == expected_sha, "Steam Legacy SHA changed"
+          print("Pinned Steam Legacy size and SHA verified")
+          PY
           stat -c '%s' steam-contract/steam-legacy.7z | tee steam-contract/size-bytes.txt
           sha256sum steam-contract/steam-legacy.7z | tee steam-contract/SHA256SUMS.txt
           7z l -slt steam-contract/steam-legacy.7z | tee steam-contract/listing.txt
