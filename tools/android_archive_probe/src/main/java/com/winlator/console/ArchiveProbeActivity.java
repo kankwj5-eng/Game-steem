@@ -10,9 +10,11 @@ import com.winlator.R;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Runs the real JNI decoder on Android, without replacing the ARM64 production engine. */
 public final class ArchiveProbeActivity extends Activity {
+    private static final AtomicBoolean STARTED = new AtomicBoolean();
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
         setContentView(R.layout.console_launcher_activity);
@@ -31,8 +33,11 @@ public final class ArchiveProbeActivity extends Activity {
                 } catch (Throwable error) { saveResult("FAIL UI: " + error); }
             });
         });
+        if (!STARTED.compareAndSet(false, true)) return;
         new Thread(() -> {
             try {
+                if (Runtime.getRuntime().maxMemory() > 192L * 1024 * 1024)
+                    throw new AssertionError("Android Java heap exceeds test budget");
                 // Reuses exactly the same extraction, receipt, progress and symlink checks as host CI.
                 NativeSteamArchiveTest.main(new String[]{new File(getFilesDir(), "steam-legacy.7z").getPath(),
                         new File(getFilesDir(), "staging").getPath()});

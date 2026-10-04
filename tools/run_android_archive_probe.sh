@@ -22,3 +22,4 @@ cat android-probe-results/result.txt
 grep -q '^PASS' android-probe-results/result.txt
 grep -q '^PASS' android-probe-results/ui-result.txt
 ! grep -q 'FAIL UI:' android-probe-results/logcat.txt
+test "$(grep -c 'INDEX: 6181' android-probe-results/logcat.txt)" = 1
