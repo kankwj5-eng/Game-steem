@@ -200,6 +200,19 @@ public final class SteamLegacyInstaller {
                 out.getFD().sync();
             }
 
+            long cacheBytes = archive.isFile() ? archive.length() : 0L;
+            if (archive.exists()) {
+                if (archive.delete()) {
+                    ConsoleLogStore.ok("LIMPIEZA · caché Steam Legacy liberada · " + formatBytes(cacheBytes));
+                }
+                else {
+                    ConsoleLogStore.warn("LIMPIEZA · no se pudo borrar la caché Steam Legacy; se conservará para el próximo arranque");
+                }
+            }
+            if (partial.exists() && !partial.delete()) {
+                ConsoleLogStore.warn("LIMPIEZA · quedó una descarga parcial residual");
+            }
+
             ConsoleLogStore.ok("STEAM LISTO · " + steamExe.getAbsolutePath() + " · " + formatBytes(steamExe.length()));
             publish(Phase.READY, "Steam Legacy instalado y verificado", 100,
                     index.uncompressedBytes, index.uncompressedBytes,

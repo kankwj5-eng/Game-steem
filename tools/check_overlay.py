@@ -44,14 +44,14 @@ for token in [
     "retry()",
     "Box64",
     "installSteamLegacy",
-    "BOOT · DroidDeck M16 ·",
+    "BOOT · DroidDeck M17 ·",
     "1400L * 1024L * 1024L",
     "1.4 GB libres",
 ]:
     if token not in controller:
-        raise SystemExit(f"controlador M16 incompleto: falta {token}")
+        raise SystemExit(f"controlador M17 incompleto: falta {token}")
 
-# M16 must not regress to hidden Windows installers.
+# M17 must not regress to hidden Windows installers.
 for forbidden in [
     "SteamSetup.exe",
     "steam_install",
@@ -60,7 +60,7 @@ for forbidden in [
     "waitForSteamAfterInstall",
 ]:
     if forbidden in controller:
-        raise SystemExit(f"controlador M16 conserva ruta antigua prohibida: {forbidden}")
+        raise SystemExit(f"controlador M17 conserva ruta antigua prohibida: {forbidden}")
 
 installer = (root / "overlay/app/src/main/java/com/winlator/console/SteamLegacyInstaller.java").read_text()
 for token in [
@@ -94,6 +94,8 @@ for token in [
     "parseContentRangeStart",
     "RANGE desalineado",
     "Descarga incompleta:",
+    "caché Steam Legacy liberada",
+    "descarga parcial residual",
 ]:
     if token not in installer:
         raise SystemExit(f"instalador Steam Legacy incompleto: falta {token}")
@@ -109,7 +111,7 @@ for token in [
     "sessionActive.get() || installerActive.get()",
 ]:
     if token not in foreground:
-        raise SystemExit(f"ForegroundService M16 incompleto: falta {token}")
+        raise SystemExit(f"ForegroundService M17 incompleto: falta {token}")
 
 activity = (root / "overlay/app/src/main/java/com/winlator/ConsoleLauncherActivity.java").read_text()
 for token in [
@@ -157,9 +159,12 @@ for token in [
     "FILE_LOG_FLUSH_BATCH",
     "postDelayed(uiNotifier",
     "public static synchronized void flush()",
+    "MAX_SESSION_FILES = 8",
+    "pruneOldLogs",
+    "Arrays.sort",
 ]:
     if token not in console_log:
-        raise SystemExit(f"log M16 no optimizado: falta {token}")
+        raise SystemExit(f"log M17 no optimizado: falta {token}")
 
 security_fixes = (root / "tools/native_security_fixes.py").read_text()
 for token in [
@@ -180,7 +185,7 @@ patcher = (root / "tools/apply_overlay.py").read_text()
 for token in [
     "/data/data/com.droiddeck.console/",
     "runOnUiThread",
-    'versionName "1.0.0-m16"',
+    'versionName "1.0.0-m17"',
     "SteamRuntimeWatchdog",
     "droidDeckSteamWatchdog = new SteamRuntimeWatchdog",
     'android:label="DroidDeck"',
@@ -198,12 +203,12 @@ for token in [
     "xz:1.12",
 ]:
     if token not in patcher:
-        raise SystemExit(f"parche M16 incompleto: falta {token}")
+        raise SystemExit(f"parche M17 incompleto: falta {token}")
 
 launcher_xml = (root / "overlay/app/src/main/res/layout/console_launcher_activity.xml").read_text()
 runtime_xml = (root / "overlay/app/src/main/res/layout/droiddeck_runtime_overlay.xml").read_text()
 for token in ['@drawable/ic_droiddeck_logo', 'DROIDDECK']:
     if token not in launcher_xml or token not in runtime_xml:
-        raise SystemExit(f"branding M16 incompleto: falta {token}")
+        raise SystemExit(f"branding M17 incompleto: falta {token}")
 
-print("Overlay M16 válido: instalación Steam Legacy nativa, telemetría y seguridad integradas.")
+print("Overlay M17 válido: instalación Steam Legacy nativa, telemetría y seguridad integradas.")

@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Deque;
 import java.util.Locale;
@@ -19,6 +20,7 @@ public final class ConsoleLogStore {
     public interface Listener { void onLogChanged(String fullLog); }
 
     private static final int MAX_LINES = 900;
+    private static final int MAX_SESSION_FILES = 8;
     private static final int FILE_LOG_FLUSH_BATCH = 32;
     private static final long FILE_LOG_FLUSH_MS = 750L;
     private static final long UI_NOTIFY_INTERVAL_MS = 120L;
@@ -51,6 +53,7 @@ public final class ConsoleLogStore {
 
         File dir = new File(context.getFilesDir(), "diagnostico");
         if (!dir.exists()) dir.mkdirs();
+        pruneOldLogs(dir);
 
         String stamp = SESSION_TIME.format(new Date());
         sessionFile = new File(dir, "droiddeck-" + stamp + ".log");
@@ -64,6 +67,19 @@ public final class ConsoleLogStore {
         }
 
         append("INFO", "Diagnóstico iniciado: " + sessionFile.getName());
+    }
+
+    private static void pruneOldLogs(File dir) {
+        File[] oldLogs = dir.listFiles((parent, name) ->
+                name.startsWith("droiddeck-") && name.endsWith(".log"));
+        if (oldLogs == null || oldLogs.length <= MAX_SESSION_FILES - 1) return;
+
+        Arrays.sort(oldLogs, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
+        for (int i = MAX_SESSION_FILES - 1; i < oldLogs.length; i++) {
+            if (!oldLogs[i].delete()) {
+                android.util.Log.w("DroidDeckLog", "No se pudo eliminar log antiguo: " + oldLogs[i].getName());
+            }
+        }
     }
 
     public static synchronized void append(String level, String message) {
