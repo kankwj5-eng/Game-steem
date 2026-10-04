@@ -322,11 +322,12 @@ public final class ConsoleBootstrapController {
         if (steamContainer == null || SteamLegacyInstaller.isRunning()) return;
 
         boolean localRecovery = SteamLegacyInstaller.hasLocalRecovery(steamContainer);
-        if (!localRecovery && !SteamLegacyInstaller.hasLocalArchive(steamContainer) && !hasNetwork()) {
+        boolean localArchive = SteamLegacyInstaller.hasLocalArchive(steamContainer);
+        if (!localRecovery && !localArchive && !hasNetwork()) {
             fail("steam", "Sin conexión a Internet para descargar Steam Legacy");
             return;
         }
-        if (!localRecovery && !hasEnoughSpace()) {
+        if (!localRecovery && !localArchive && !hasEnoughSpace()) {
             fail("steam", "Se necesitan al menos 1.4 GB libres para Steam Legacy (descarga + extracción + margen)");
             return;
         }

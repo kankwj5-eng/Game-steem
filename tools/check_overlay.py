@@ -111,6 +111,12 @@ for token in [
     if token not in installer:
         raise SystemExit(f"instalador Steam Legacy incompleto: falta {token}")
 
+# Interrupted staging must not be counted as space still needed for a fresh extraction.
+if installer.index("FileUtils.delete(stagingRoot)") > installer.index("long usableBytes ="):
+    raise SystemExit("recuperación: staging se limpia demasiado tarde para comprobar espacio")
+if "!localRecovery && !localArchive && !hasEnoughSpace()" not in controller:
+    raise SystemExit("recuperación: caché local vuelve a exigir margen de descarga completa")
+
 foreground = (root / "overlay/app/src/main/java/com/winlator/services/ForegroundService.java").read_text()
 for token in [
     "installerActive",
