@@ -106,11 +106,35 @@ public final class SteamLegacyInstaller {
         return true;
     }
 
+    public static boolean isInstalled(File steamDirectory) {
+        return SteamInstallation.isReady(steamDirectory, ASSET_URL, EXPECTED_SHA256);
+    }
+
+    public static boolean hasLocalRecovery(Container container) {
+        File driveC = new File(container.getRootDir(), ".wine/drive_c");
+        File root = new File(driveC, "Program Files (x86)");
+        return isInstalled(new File(root, ".droiddeck-steam-stage/Steam"))
+                || (!new File(root, "Steam").exists()
+                    && isInstalled(new File(root, ".droiddeck-steam-previous")));
+    }
+
+    public static boolean hasLocalArchive(Container container) {
+        File archive = new File(container.getRootDir(), ".wine/drive_c/windows/temp/winlator-addon.7z");
+        return archive.isFile() && archive.length() == EXPECTED_ARCHIVE_BYTES
+                && hasSevenZipSignature(archive);
+    }
+
     private static void runInstall(Context context, Container container) {
         try {
             File driveC = new File(container.getRootDir(), ".wine/drive_c");
             File steamExe = new File(driveC, "Program Files (x86)/Steam/steam.exe");
-            if (steamExe.isFile()) {
+            File targetRoot = steamExe.getParentFile().getParentFile();
+            File stagingRoot = new File(targetRoot, ".droiddeck-steam-stage");
+            File stagedSteam = new File(stagingRoot, "Steam");
+            File previousSteam = new File(targetRoot, ".droiddeck-steam-previous");
+            SteamInstallation.recover(steamExe.getParentFile(), stagedSteam, previousSteam,
+                    ASSET_URL, EXPECTED_SHA256);
+            if (isInstalled(steamExe.getParentFile())) {
                 publish(Phase.READY, "Steam ya está instalado", 100, steamExe.length(), steamExe.length(), "C:\\Program Files (x86)\\Steam\\steam.exe");
                 ConsoleLogStore.ok("Steam ya estaba instalado: " + steamExe.getAbsolutePath());
                 return;
@@ -175,32 +199,25 @@ public final class SteamLegacyInstaller {
                         + ", necesarios aprox. " + formatBytes(requiredBytes));
             }
 
-            File targetRoot = new File(driveC, "Program Files (x86)");
             if (!targetRoot.isDirectory() && !targetRoot.mkdirs()) {
-                throw new IllegalStateException("No se pudo preparar C:\\Program Files (x86)");
+                throw new IllegalStateException("No se pudo preparar la carpeta de Steam");
             }
-
-            File steamDir = new File(targetRoot, "Steam");
-            if (steamDir.exists() && !steamExe.isFile()) {
-                ConsoleLogStore.warn("LIMPIEZA · instalación parcial anterior detectada; eliminando C:\\Program Files (x86)\\Steam");
-                FileUtils.delete(steamDir);
+            // Only disposable extraction staging is removed; existing Steam data is retained.
+            if (stagingRoot.exists()) FileUtils.delete(stagingRoot);
+            if (stagingRoot.exists() || !stagingRoot.mkdirs()) {
+                throw new IllegalStateException("No se pudo preparar la extracción temporal de Steam");
             }
-
-            extractArchive(archive, targetRoot, index);
-
-            publish(Phase.FINALIZING, "Verificando instalación final", 98, index.uncompressedBytes, index.uncompressedBytes,
-                    "C:\\Program Files (x86)\\Steam\\steam.exe");
-
-            if (!steamExe.isFile() || steamExe.length() < 256 * 1024L) {
-                throw new IllegalStateException("La extracción terminó, pero steam.exe no quedó válido");
+            ConsoleLogStore.info("RECUPERACIÓN · extrayendo copia verificada sin borrar Steam anterior");
+            extractArchive(archive, stagingRoot, index);
+            publish(Phase.FINALIZING, "Verificando y activando instalación", 98,
+                    index.uncompressedBytes, index.uncompressedBytes, "Steam/steam.exe");
+            SteamInstallation.writeReceipt(stagedSteam, ASSET_URL, sha256);
+            SteamInstallation.promote(steamExe.getParentFile(), stagedSteam, previousSteam,
+                    ASSET_URL, EXPECTED_SHA256);
+            if (!isInstalled(steamExe.getParentFile())) {
+                throw new IllegalStateException("La instalación final no está completa");
             }
-
-            File marker = new File(steamDir, ".droiddeck-source");
-            try (FileOutputStream out = new FileOutputStream(marker, false)) {
-                String markerText = "source=" + ASSET_URL + "\nsha256=" + sha256 + "\n";
-                out.write(markerText.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                out.getFD().sync();
-            }
+            if (stagingRoot.exists()) FileUtils.delete(stagingRoot);
 
             long cacheBytes = archive.isFile() ? archive.length() : 0L;
             if (archive.exists()) {
@@ -426,6 +443,9 @@ public final class SteamLegacyInstaller {
             while ((entry = sevenZ.getNextEntry()) != null) {
                 String name = normalizeEntryName(entry.getName());
                 if (name.isEmpty()) continue;
+                if (!name.equals("Steam") && !name.startsWith("Steam/")) {
+                    throw new SecurityException("Entrada fuera de Steam: " + name);
+                }
 
                 File output = new File(targetRoot, name);
                 String canonicalOutput = output.getCanonicalPath();
@@ -451,10 +471,12 @@ public final class SteamLegacyInstaller {
                         + " · " + formatBytes(Math.max(0L, entry.getSize())));
 
                 try (FileOutputStream out = new FileOutputStream(output, false)) {
+                    long fileBytes = 0L;
                     int read;
                     while ((read = sevenZ.read(buffer)) > 0) {
                         out.write(buffer, 0, read);
                         extracted += read;
+                        fileBytes += read;
 
                         long now = System.currentTimeMillis();
                         if (now - lastUi >= 150L) {
@@ -468,12 +490,18 @@ public final class SteamLegacyInstaller {
                             publish(Phase.EXTRACTING, detail, uiPct, extracted, index.uncompressedBytes, name);
                         }
                     }
-                    // Closing the stream is enough here. fsync() per extracted file made the
-                    // 6k+ entry Steam package dramatically slower on Android flash storage.
+                    if (fileBytes != entry.getSize()) {
+                        throw new IllegalStateException("Archivo extraído incompleto: " + name);
+                    }
+                    // Persist all payload files before the completion receipt, including power loss.
+                    out.getFD().sync();
                 }
             }
         }
 
+        if (extracted != index.uncompressedBytes) {
+            throw new IllegalStateException("Extracción incompleta: " + extracted + "/" + index.uncompressedBytes);
+        }
         ConsoleLogStore.flush();
         ConsoleLogStore.ok("EXTRACCIÓN COMPLETA · " + formatBytes(extracted));
     }
