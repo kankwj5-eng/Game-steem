@@ -33,6 +33,8 @@ public final class SteamLegacyInstaller {
     public static final String EXPECTED_SHA256 = "f5771fed575afb8ef8a133ee28e34a6b4191a366943d0ff7505eab3846b3d19c";
     private static final int HTTP_RANGE_NOT_SATISFIABLE = 416;
     private static final long EXPECTED_ARCHIVE_BYTES = 215_772_926L;
+    private static final int DOWNLOAD_ATTEMPTS = 4;
+    private static final long RETRY_BASE_MS = 1_500L;
 
     public enum Phase {
         IDLE,
@@ -232,17 +234,19 @@ public final class SteamLegacyInstaller {
 
     private static void downloadWithRetry(File partial, File archive) throws Exception {
         Exception last = null;
-        for (int attempt = 1; attempt <= 3; attempt++) {
+        for (int attempt = 1; attempt <= DOWNLOAD_ATTEMPTS; attempt++) {
             try {
                 downloadOnce(partial, archive, attempt);
                 return;
             }
             catch (Exception error) {
                 last = error;
-                ConsoleLogStore.warn("DESCARGA intento " + attempt + "/3 · " + error.getMessage());
-                if (attempt < 3) {
+                ConsoleLogStore.warn("DESCARGA intento " + attempt + "/" + DOWNLOAD_ATTEMPTS + " · " + error.getMessage());
+                if (attempt < DOWNLOAD_ATTEMPTS) {
+                    long delayMs = RETRY_BASE_MS * (1L << (attempt - 1));
+                    ConsoleLogStore.info("RED · reintento automático en " + String.format(Locale.US, "%.1f s", delayMs / 1000.0));
                     try {
-                        Thread.sleep(900L * attempt);
+                        Thread.sleep(delayMs);
                     }
                     catch (InterruptedException interrupted) {
                         Thread.currentThread().interrupt();
@@ -309,7 +313,7 @@ public final class SteamLegacyInstaller {
             throw new SecurityException("Tamaño inesperado de steam-legacy.7z: "
                     + formatBytes(expected) + " · esperado " + formatBytes(EXPECTED_ARCHIVE_BYTES));
         }
-        ConsoleLogStore.info("HTTP " + code + " · intento " + attempt + "/3"
+        ConsoleLogStore.info("HTTP " + code + " · intento " + attempt + "/" + DOWNLOAD_ATTEMPTS
                 + (resumed ? " · reanudando " + formatBytes(existing) : " · descarga nueva")
                 + (expected > 0 ? " · total " + formatBytes(expected) : ""));
 
