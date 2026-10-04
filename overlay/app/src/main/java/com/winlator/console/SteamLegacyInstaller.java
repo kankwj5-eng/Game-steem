@@ -32,6 +32,7 @@ public final class SteamLegacyInstaller {
     // Se completa con el digest verificado por el job steam_contract antes de la entrega final.
     public static final String EXPECTED_SHA256 = "f5771fed575afb8ef8a133ee28e34a6b4191a366943d0ff7505eab3846b3d19c";
     private static final int HTTP_RANGE_NOT_SATISFIABLE = 416;
+    private static final long EXPECTED_ARCHIVE_BYTES = 215_772_926L;
 
     public enum Phase {
         IDLE,
@@ -268,10 +269,33 @@ public final class SteamLegacyInstaller {
             connection.disconnect();
             throw new IllegalStateException("HTTP " + code + " al descargar Steam Legacy");
         }
-        if (!resumed) existing = 0L;
+
+        if (resumed) {
+            String contentRange = connection.getHeaderField("Content-Range");
+            long rangeStart = parseContentRangeStart(contentRange);
+            if (rangeStart != existing) {
+                connection.disconnect();
+                ConsoleLogStore.warn("RANGE desalineado · esperado " + existing + " · recibido " + contentRange
+                        + " · reiniciando copia limpia");
+                if (!partial.delete()) {
+                    throw new IllegalStateException("No se pudo eliminar la descarga parcial desalineada");
+                }
+                publish(Phase.DOWNLOADING, "Rango inválido · reiniciando copia limpia", 1, 0, 0, "steam-legacy.7z");
+                downloadOnce(partial, archive, attempt);
+                return;
+            }
+        }
+        else {
+            existing = 0L;
+        }
 
         long bodyLength = connection.getContentLengthLong();
         long expected = bodyLength > 0 ? existing + bodyLength : -1L;
+        if (expected > 0L && expected != EXPECTED_ARCHIVE_BYTES) {
+            connection.disconnect();
+            throw new SecurityException("Tamaño inesperado de steam-legacy.7z: "
+                    + formatBytes(expected) + " · esperado " + formatBytes(EXPECTED_ARCHIVE_BYTES));
+        }
         ConsoleLogStore.info("HTTP " + code + " · intento " + attempt + "/3"
                 + (resumed ? " · reanudando " + formatBytes(existing) : " · descarga nueva")
                 + (expected > 0 ? " · total " + formatBytes(expected) : ""));
@@ -320,6 +344,13 @@ public final class SteamLegacyInstaller {
         }
 
         long finalSize = partial.length();
+        if (finalSize > EXPECTED_ARCHIVE_BYTES) {
+            throw new SecurityException("El paquete descargado supera el tamaño oficial esperado: " + formatBytes(finalSize));
+        }
+        if (finalSize < EXPECTED_ARCHIVE_BYTES) {
+            throw new IllegalStateException("Descarga incompleta: " + formatBytes(finalSize)
+                    + " / " + formatBytes(EXPECTED_ARCHIVE_BYTES));
+        }
         if (expected > 0 && finalSize != expected) {
             throw new IllegalStateException("Descarga incompleta: " + formatBytes(finalSize) + " / " + formatBytes(expected));
         }
@@ -467,6 +498,22 @@ public final class SteamLegacyInstaller {
         StringBuilder out = new StringBuilder();
         for (byte b : digest.digest()) out.append(String.format(Locale.US, "%02x", b & 0xff));
         return out.toString();
+    }
+
+    private static long parseContentRangeStart(String header) {
+        if (header == null) return -1L;
+        String value = header.trim().toLowerCase(Locale.US);
+        if (!value.startsWith("bytes ")) return -1L;
+
+        int dash = value.indexOf('-', 6);
+        if (dash < 0) return -1L;
+
+        try {
+            return Long.parseLong(value.substring(6, dash).trim());
+        }
+        catch (NumberFormatException ignored) {
+            return -1L;
+        }
     }
 
     private static String normalizeEntryName(String name) {
