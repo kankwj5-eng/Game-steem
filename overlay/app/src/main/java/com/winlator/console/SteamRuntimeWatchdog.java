@@ -25,6 +25,7 @@ import java.util.concurrent.Executors;
 public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
     private static final long TICK_MS = 1000L;
     private static final long FILE_SCAN_MS = 5000L;
+    private static final long PROCESS_SCAN_MS = 2000L;
     private static final long STALL_MS = 60_000L;
 
     private final XServerDisplayActivity activity;
@@ -41,6 +42,7 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
     private volatile boolean winHandlerResponded;
     private volatile long lastActivityAt;
     private long startedAt;
+    private long lastProcessScanAt;
 
     private long rxBaseline = -1L;
     private long lastRxBytes = -1L;
@@ -80,8 +82,11 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
 
             long now = android.os.SystemClock.elapsedRealtime();
             sampleNetwork(now);
-            sampleLinuxProcesses();
-            winHandler.listProcesses();
+            if (now - lastProcessScanAt >= PROCESS_SCAN_MS) {
+                lastProcessScanAt = now;
+                sampleLinuxProcesses();
+                winHandler.listProcesses();
+            }
             scheduleFileScan(now);
             publishCombinedTelemetry();
 
@@ -110,7 +115,7 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
         winHandler.setOnGetProcessInfoListener(this);
         ProcessHelper.addDebugCallback(runtimeDebugCallback);
 
-        ConsoleLogStore.info("WATCHDOG iniciado · propósito=" + purpose + " · archivos cada " + FILE_SCAN_MS + " ms");
+        ConsoleLogStore.info("WATCHDOG iniciado · propósito=" + purpose + " · procesos cada " + PROCESS_SCAN_MS + " ms · archivos cada " + FILE_SCAN_MS + " ms");
         handler.post(ticker);
     }
 
