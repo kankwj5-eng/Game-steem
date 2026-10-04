@@ -267,7 +267,7 @@ public final class SteamLegacyInstaller {
     }
 
     private static void syncDirectory(File directory) throws ErrnoException {
-        FileDescriptor descriptor = Os.open(directory.getAbsolutePath(), OsConstants.O_RDONLY | OsConstants.O_DIRECTORY, 0);
+        FileDescriptor descriptor = Os.open(directory.getAbsolutePath(), OsConstants.O_RDONLY, 0);
         try { Os.fsync(descriptor); }
         finally { Os.close(descriptor); }
     }
