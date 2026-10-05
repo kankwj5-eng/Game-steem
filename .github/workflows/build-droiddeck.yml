@@ -228,8 +228,8 @@ jobs:
           "$SDKMANAGER" "platforms;android-35" "ndk;24.0.8215888" "cmake;3.22.1"
           mkdir -p tools/android_archive_probe/generated/java/com/winlator/console steam-contract
           cp overlay/app/src/main/java/com/winlator/console/{NativeSteamArchive,SteamInstallation,InstallerError}.java tools/android_archive_probe/generated/java/com/winlator/console/
-          cp tools/tests/{NativeSteamArchiveTest,RuntimeStartupTest,RuntimeLogThrottleTest}.java tools/android_archive_probe/generated/java/com/winlator/console/
-          cp overlay/app/src/main/java/com/winlator/console/{ObservedProcess,RuntimeStartupPolicy,ProcessCpuActivity,RuntimeConsoleOverlay,ConsoleLogStore,RuntimeLogThrottle}.java tools/android_archive_probe/generated/java/com/winlator/console/
+          cp tools/tests/{NativeSteamArchiveTest,RuntimeStartupTest,RuntimeLogThrottleTest,SteamProcessRecoveryTest}.java tools/android_archive_probe/generated/java/com/winlator/console/
+          cp overlay/app/src/main/java/com/winlator/console/{ObservedProcess,RuntimeStartupPolicy,ProcessCpuActivity,RuntimeConsoleOverlay,ConsoleLogStore,RuntimeLogThrottle,SteamProcessRecovery,AndroidRuntimeDiagnostics}.java tools/android_archive_probe/generated/java/com/winlator/console/
           mkdir -p tools/android_archive_probe/generated/java/com/winlator/core
           cp winlator-app/app/src/main/java/com/winlator/core/{Callback,EnvVars,ProcessHelper}.java tools/android_archive_probe/generated/java/com/winlator/core/
           curl -fL --retry 4 --retry-all-errors --max-time 900 https://github.com/brunodev85/winlator-addons/releases/download/v1.0.0/steam-legacy.7z -o steam-contract/steam-legacy.7z

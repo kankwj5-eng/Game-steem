@@ -10,8 +10,9 @@ M21 extrae en staging, verifica los tamaños de todos los archivos y confirma el
 
 Los archivos y directorios se sincronizan antes de confirmar la instalación para reducir el riesgo por apagados. Esto añade coste a la primera extracción; el arranque habitual solo comprueba el marcador y seis binarios. Tras una instalación verificada se elimina la caché del paquete.
 
-## Arranque y pantalla · M25
+## Arranque y pantalla · M26
 
+- M26 recupera procesos del entorno Steam marcados por la app al iniciar y cerrar; conserva los procesos sin marcador, incluido el instalador. Registra la RAM disponible y las restricciones de procesos hijos sin cambiar ajustes del sistema. [Recuperación y límites M26](docs/recuperacion-procesos-m26.md).
 - La consola se desconecta al ocultarse; el launcher deja de recibir logs en segundo plano. El historial visual se limita a 64 Ki caracteres y el modo normal agrupa repetidos con presupuesto de 40 líneas/s; el detalle opcional conserva los registros. [Pruebas y límites de rendimiento M25](docs/rendimiento-m25.md).
 - Arranque observado con errores y salida real; monitor de CPU y ventanas con metadatos tardíos. La espera permite ver el motor, volver y compartir el registro. Detalles y límites en [auditoría M24](docs/auditoria-arranque-steam-m24.md).
 - Extracción nativa C de 7-Zip: evita el diccionario de 256 MiB en Java que causaba el error de memoria. El paquete sólido aún necesita aproximadamente 527 MiB temporales nativos en la prueba local; se liberan al terminar. Fuente fijada en `native-dependencies.lock`.

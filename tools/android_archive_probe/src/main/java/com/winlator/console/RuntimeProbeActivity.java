@@ -20,6 +20,14 @@ public final class RuntimeProbeActivity extends Activity {
         super.onCreate(saved);
         if (!STARTED.compareAndSet(false, true)) return;
         ConsoleLogStore.initialize(this);
+        AndroidRuntimeDiagnostics.record(this);
+        if (!AndroidRuntimeDiagnostics.describe(null).contains("desconocido")
+                || !AndroidRuntimeDiagnostics.describe("weird").contains("desconocido")
+                || !AndroidRuntimeDiagnostics.describe("false").equals("desactivada")
+                || !AndroidRuntimeDiagnostics.describe("0").equals("desactivada")
+                || !AndroidRuntimeDiagnostics.describe("true").startsWith("activada")) {
+            throw new AssertionError("Unknown child restrictions must stay unknown");
+        }
         AtomicInteger cancelled = new AtomicInteger();
         RuntimeConsoleOverlay overlay = new RuntimeConsoleOverlay(this, cancelled::incrementAndGet);
         overlay.waitingTelemetry(600000, "Sin actividad observable", "steam.exe", 1, 2, 0,
@@ -71,6 +79,7 @@ public final class RuntimeProbeActivity extends Activity {
             try {
                 RuntimeStartupTest.main(new String[]{"/system/bin/sh"});
                 testProcessHelper();
+                SteamProcessRecoveryTest.main(new String[]{"/system/bin/sh"});
                 RuntimeLogThrottleTest.main(new String[0]);
                 save("runtime-result.txt", "PASS real Android process output, exit and failure");
             } catch (Throwable error) { save("runtime-result.txt", "FAIL " + error); }

@@ -5,6 +5,7 @@ import sys
 import re
 
 from runtime_startup_fixes import apply_runtime_startup_fixes
+from runtime_process_recovery import apply_runtime_process_recovery
 from native_security_fixes import apply_native_security_fixes
 from prepare_7zip_sdk import prepare as prepare_7zip_sdk
 
@@ -88,8 +89,8 @@ manifest.write_text(text, encoding="utf-8")
 
 btext = build_gradle.read_text(encoding="utf-8")
 btext = btext.replace("applicationId 'com.winlator'", "applicationId 'com.droiddeck.console'")
-btext = btext.replace("versionCode 33", "versionCode 36")
-btext = btext.replace('versionName "11.2"', 'versionName "1.0.0-m25"')
+btext = btext.replace("versionCode 33", "versionCode 37")
+btext = btext.replace('versionName "11.2"', 'versionName "1.0.0-m26"')
 btext = btext.replace("org.tukaani:xz:1.7", "org.tukaani:xz:1.12")
 btext = btext.replace("org.apache.commons:commons-compress:1.20", "org.apache.commons:commons-compress:1.28.0")
 build_gradle.write_text(btext, encoding="utf-8")
@@ -576,7 +577,8 @@ nutext = nutext.replace('"Allows to display Winlator foreground notifications"',
 notification_utils.write_text(nutext, encoding="utf-8")
 
 apply_runtime_startup_fixes(src)
+apply_runtime_process_recovery(src)
 apply_native_security_fixes(src)
 
-print("Overlay DroidDeck M25 aplicado.")
+print("Overlay DroidDeck M26 aplicado.")
 print("Base esperada:", EXPECTED_SHA)
