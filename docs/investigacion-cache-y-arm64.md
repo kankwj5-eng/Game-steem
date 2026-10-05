@@ -6,7 +6,7 @@ Revisión 2026-10-05 UTC. Objetivo: Steam-only, español, Mali-first, Android de
 
 La base fijada de Winlator 11.2 incluye Box64 0.4.4. Su `GuestProgramLauncherComponent.addBox64EnvVars` establece `BOX64_DYNACACHE=0`. Se examinó el binario ARM64 distribuido en `box64-0.4.4.tzst`: incluye las opciones DynaCache, carga, serialización, limpieza y límites. La [documentación de esa versión](https://github.com/ptitSeb/box64/blob/v0.4.4/docs/USAGE.md#box64_dynacache) describe guardar código generado y reutilizarlo. No supone traducir todo Steam de antemano ni evita la traducción de código nuevo o autogenerado por CEF.
 
-Valores: 0 desactivado; 1 lectura/escritura; 2 solo lectura de caché existente. En esta versión se documentan carpeta, límite en MiB, compresión y tamaño mínimo. El límite upstream es 2048 MiB de disco; no es presupuesto de RAM. Para un experimento móvil debe usarse una carpeta privada y un límite de disco mucho menor, observable y reversible. M26 conserva el valor 0 mientras se completa la prueba ARM64; no declara mayor fluidez por encontrar el interruptor.
+Valores: 0 desactivado; 1 lectura/escritura; 2 solo lectura de caché existente. En esta versión se documentan carpeta, límite en MiB, compresión y tamaño mínimo. El límite upstream es 2048 MiB de disco; no es presupuesto de RAM. Para un experimento móvil debe usarse una carpeta privada y un límite de disco mucho menor, observable y reversible. M26 conserva el valor 0. M27 ofrece activación experimental en Diagnóstico, con carpeta privada compartida de caché y objetivo de disco de 128 MiB; no declara mayor fluidez por encontrar el interruptor.
 
 Experimento siguiente: motor/Wine/paquete/preset fijados, Steam sin caché, primer arranque con caché y segundo arranque caliente. Registrar tiempo hasta ventana útil, memoria Java/nativa, CPU por proceso, archivos de caché y tirones. Confirmar que realmente carga bloques, probar actualización, archivo corrupto, disco lleno y cierre forzado. Limpiar únicamente caché propia; conservar userdata y juegos. No compartir código generado entre teléfonos o versiones sin validar la clave y la invalidación upstream. No elevar el preset agresivo ni quitar barreras de memoria para “compensar” una caché que no carga.
 
@@ -25,3 +25,11 @@ Interfaz, descarga/reanudación/verificación del paquete, recuperación de inst
 ## Evidencia pendiente
 
 Las pruebas x86_64 del host y del emulador Android verifican nuestra lógica, memoria de extracción e interfaz. No ejecutan el Box64 ARM64 ni reproducen Mali. El resultado que decide un cambio predeterminado será una comparación en teléfono ARM64/Mali, no las cifras de un proyecto en Snapdragon.
+
+## Prueba funcional ARM64 realizada · M27
+
+Se ejecutó el binario ARM64 real de Winlator Box64 0.4.4, con el loader/glibc ARM64 de su rootfs, bajo QEMU user-mode 7.2. Un pequeño programa x86_64 produjo `RESULT=17849950052195505252`. El primer arranque generó un archivo de 8192 bytes; el segundo informó la carga de un bloque y produjo el mismo resultado. El modo de solo lectura conservó el contenido de la caché. Una cabecera corrupta se rechazó y regeneró; una carpeta inaccesible y el modo desactivado continuaron sin cargar caché. Cambiar la función traducida, conservando el tamaño del ELF, produjo el resultado actualizado `6311175984321895946`.
+
+`tools/test_box64_dynacache.py` reproduce esos casos y guarda los logs. Solo la prueba reduce `BOX64_DYNACACHE_MIN` a 0 para su fixture pequeño; la APK conserva el umbral normal. CI usa QEMU del runner y publica `box64-cache-proof`. No se usa la duración bajo QEMU como medida de velocidad en el teléfono. El programa de prueba ELF no verifica cuánto del cliente PE/JIT de Steam puede cachearse ni sus condiciones de seccomp Android.
+
+La lectura de `src/tools/dynacache.c` de Box64 v0.4.4 confirmó validación de formato, hashes de dynarec/backend, tamaño de página, extensiones CPU, checksums de cabecera/payload, ruta/tamaño del binario y ajustes de traducción. La prueba de binario modificado comprueba el resultado real, aunque el loader pueda anunciar bloques cargados que después se validan al usarlos.

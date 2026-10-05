@@ -50,6 +50,7 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
     private View errorActions;
     private View diagnosticsHeader;
     private CheckBox detailedLogs;
+    private CheckBox translationCache;
     private boolean permissionsBlocked;
 
     @Override
@@ -85,6 +86,12 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
                 PreferenceManager.getDefaultSharedPreferences(this).edit()
                         .putBoolean("droiddeck_detailed_logs", checked).apply());
 
+        translationCache = findViewById(R.id.CBTranslationCache);
+        translationCache.setChecked(PreferenceManager.getDefaultSharedPreferences(this)
+                .getBoolean(com.winlator.console.TranslationCachePolicy.PREF, false));
+        translationCache.setOnCheckedChangeListener((button, checked) ->
+                PreferenceManager.getDefaultSharedPreferences(this).edit()
+                        .putBoolean(com.winlator.console.TranslationCachePolicy.PREF, checked).apply());
         ConsoleLogStore.initialize(this);
         logPath.setText(ConsoleLogStore.getSessionFilePath());
 
@@ -322,6 +329,7 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
         int visibility = visible ? View.VISIBLE : View.GONE;
         diagnosticsHeader.setVisibility(visibility);
         detailedLogs.setVisibility(visibility);
+        translationCache.setVisibility(visibility);
         logScroll.setVisibility(visibility);
         ((Button)findViewById(R.id.BTDiagnostics)).setText(visible ? "OCULTAR REGISTRO" : "DIAGNÓSTICO");
         if (visible && logUiActive) {
