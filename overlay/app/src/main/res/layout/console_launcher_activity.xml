@@ -282,6 +282,16 @@
             android:textSize="11sp"
             android:visibility="gone" />
 
+        <CheckBox
+            android:id="@+id/CBTranslationCache"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="Reutilizar traducciones en próximos inicios (experimental)"
+            android:textColor="@color/console_muted"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
         <ScrollView
             android:visibility="gone"
             android:id="@+id/SVConsoleLog"

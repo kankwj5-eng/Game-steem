@@ -79,6 +79,7 @@ public final class RuntimeProbeActivity extends Activity {
             try {
                 RuntimeStartupTest.main(new String[]{"/system/bin/sh"});
                 testProcessHelper();
+                TranslationCachePolicyTest.main(new String[0]);
                 SteamProcessRecoveryTest.main(new String[]{"/system/bin/sh"});
                 RuntimeLogThrottleTest.main(new String[0]);
                 save("runtime-result.txt", "PASS real Android process output, exit and failure");

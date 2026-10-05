@@ -18,6 +18,10 @@ public final class ArchiveProbeActivity extends Activity {
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
         setContentView(R.layout.console_launcher_activity);
+        findViewById(R.id.DiagnosticsHeader).setVisibility(View.VISIBLE);
+        findViewById(R.id.CBDetailedLogs).setVisibility(View.VISIBLE);
+        findViewById(R.id.CBTranslationCache).setVisibility(View.VISIBLE);
+        findViewById(R.id.SVConsoleLog).setVisibility(View.VISIBLE);
         TextView detail = findViewById(R.id.TVCurrentDetail);
         detail.setText(InstallerError.userMessage(new OutOfMemoryError("256 MB allocation")));
         findViewById(R.id.TVCurrentPercent).setVisibility(View.GONE);
@@ -29,6 +33,9 @@ public final class ArchiveProbeActivity extends Activity {
                     Rect bounds = new Rect();
                     if (!findViewById(R.id.BTStartSteam).getGlobalVisibleRect(bounds) || bounds.height() < 20)
                         throw new AssertionError("Steam button cannot be reached on short landscape screen");
+                    View cache = findViewById(R.id.CBTranslationCache);
+                    if (!cache.getGlobalVisibleRect(bounds) || bounds.height() < cache.getHeight() - 2)
+                        throw new AssertionError("Translation cache option clipped on short landscape screen");
                     Files.write(new File(getFilesDir(), "ui-result.txt").toPath(), "PASS\n".getBytes(StandardCharsets.UTF_8));
                 } catch (Throwable error) { saveResult("FAIL UI: " + error); }
             });
