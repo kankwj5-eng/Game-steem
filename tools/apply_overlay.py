@@ -4,6 +4,7 @@ import shutil
 import sys
 import re
 
+from runtime_startup_fixes import apply_runtime_startup_fixes
 from native_security_fixes import apply_native_security_fixes
 from prepare_7zip_sdk import prepare as prepare_7zip_sdk
 
@@ -87,8 +88,8 @@ manifest.write_text(text, encoding="utf-8")
 
 btext = build_gradle.read_text(encoding="utf-8")
 btext = btext.replace("applicationId 'com.winlator'", "applicationId 'com.droiddeck.console'")
-btext = btext.replace("versionCode 33", "versionCode 34")
-btext = btext.replace('versionName "11.2"', 'versionName "1.0.0-m23"')
+btext = btext.replace("versionCode 33", "versionCode 35")
+btext = btext.replace('versionName "11.2"', 'versionName "1.0.0-m24"')
 btext = btext.replace("org.tukaani:xz:1.7", "org.tukaani:xz:1.12")
 btext = btext.replace("org.apache.commons:commons-compress:1.20", "org.apache.commons:commons-compress:1.28.0")
 build_gradle.write_text(btext, encoding="utf-8")
@@ -574,7 +575,8 @@ nutext = nutext.replace('"Winlator Foreground Service"', '"DroidDeck en segundo 
 nutext = nutext.replace('"Allows to display Winlator foreground notifications"', '"Mantiene Steam y el motor de DroidDeck activos en segundo plano"')
 notification_utils.write_text(nutext, encoding="utf-8")
 
+apply_runtime_startup_fixes(src)
 apply_native_security_fixes(src)
 
-print("Overlay DroidDeck M23 aplicado.")
+print("Overlay DroidDeck M24 aplicado.")
 print("Base esperada:", EXPECTED_SHA)

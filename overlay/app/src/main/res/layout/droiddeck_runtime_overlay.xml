@@ -6,10 +6,15 @@
     android:orientation="horizontal"
     android:elevation="100dp">
 
-    <LinearLayout
+    <ScrollView
+        android:id="@+id/SVRuntimeStatus"
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
+        android:fillViewport="true">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingStart="34dp"
         android:paddingTop="28dp"
@@ -48,7 +53,7 @@
             android:textSize="10sp"
             android:textStyle="bold" />
 
-        <Space android:layout_width="1dp" android:layout_height="0dp" android:layout_weight="1" />
+
 
         <TextView
             android:id="@+id/TVRuntimeStage"
@@ -56,7 +61,7 @@
             android:layout_height="wrap_content"
             android:text="Motor"
             android:textColor="@color/console_text"
-            android:textSize="38sp"
+            android:textSize="28sp"
             android:textStyle="bold" />
 
         <TextView
@@ -113,12 +118,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
-            android:text="Puedes salir de la app. DroidDeck seguirá trabajando en segundo plano."
+            android:text="Si Steam no aparece, abre la pantalla del motor o vuelve para reintentar."
             android:textColor="@color/console_muted"
             android:textSize="11sp" />
 
-        <Space android:layout_width="1dp" android:layout_height="0dp" android:layout_weight="1" />
+
     </LinearLayout>
+
+    </ScrollView>
 
     <View
         android:layout_width="1dp"
@@ -183,5 +190,10 @@
                 android:textIsSelectable="true"
                 android:textSize="10sp" />
         </ScrollView>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <Button android:id="@+id/BTRuntimeShow" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="Ver pantalla" android:textSize="11sp" />
+            <Button android:id="@+id/BTRuntimeBack" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="Volver" android:textSize="11sp" />
+        </LinearLayout>
+        <Button android:id="@+id/BTRuntimeShare" android:layout_width="match_parent" android:layout_height="48dp" android:text="Compartir registro" android:textSize="11sp" />
     </LinearLayout>
 </LinearLayout>

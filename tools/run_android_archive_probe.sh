@@ -23,3 +23,14 @@ grep -q '^PASS' android-probe-results/result.txt
 grep -q '^PASS' android-probe-results/ui-result.txt
 ! grep -q 'FAIL UI:' android-probe-results/logcat.txt
 test "$(grep -c 'INDEX: 6181' android-probe-results/logcat.txt)" = 1
+
+adb shell am start -W -n "$APP/com.winlator.console.RuntimeProbeActivity"
+for attempt in $(seq 1 30); do
+  if adb shell run-as "$APP" cat files/runtime-result.txt > android-probe-results/runtime-result.txt 2>/dev/null &&
+     adb shell run-as "$APP" cat files/runtime-ui.txt > android-probe-results/runtime-ui.txt 2>/dev/null; then break; fi
+  sleep 1
+done
+adb logcat -d > android-probe-results/runtime-logcat.txt
+cat android-probe-results/runtime-result.txt android-probe-results/runtime-ui.txt
+grep -q '^PASS' android-probe-results/runtime-result.txt
+grep -q '^PASS' android-probe-results/runtime-ui.txt

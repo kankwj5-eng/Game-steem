@@ -10,8 +10,9 @@ M21 extrae en staging, verifica los tamaños de todos los archivos y confirma el
 
 Los archivos y directorios se sincronizan antes de confirmar la instalación para reducir el riesgo por apagados. Esto añade coste a la primera extracción; el arranque habitual solo comprueba el marcador y seis binarios. Tras una instalación verificada se elimina la caché del paquete.
 
-## Rendimiento y pantalla · M23
+## Arranque y pantalla · M24
 
+- Arranque observado con errores y salida real; monitor de CPU y ventanas con metadatos tardíos. La espera permite ver el motor, volver y compartir el registro. Detalles y límites en [auditoría M24](docs/auditoria-arranque-steam-m24.md).
 - Extracción nativa C de 7-Zip: evita el diccionario de 256 MiB en Java que causaba el error de memoria. El paquete sólido aún necesita aproximadamente 527 MiB temporales nativos en la prueba local; se liberan al terminar. Fuente fijada en `native-dependencies.lock`.
 - Errores breves en español, porcentaje oculto al fallar y columna principal desplazable para alcanzar los botones en pantallas horizontales pequeñas.
 - Perfil Box64 de rendimiento, servicios esenciales y ahorro de memoria de Steam.
@@ -42,10 +43,11 @@ Base: `brunodev85/winlator-app`, commit `3981d86efa4f333b2a34a7da8b6521476cd8c8b
 ```sh
 python3 tools/check_overlay.py
 bash tools/test_steam_installation.sh  # JDK 17
+bash tools/test_runtime_startup.sh
 bash tools/prepare_effective_source.sh
 ```
 
-Actions ejecuta los controles en PR y en main: Gradle assembleDebug, firma de desarrollo estable, inspección de package `com.droiddeck.console`, contrato real de Steam Legacy, extracción con Java limitado a 64 MiB, prueba Android de JNI y pantalla pequeña, y análisis. El artefacto M23 se llama `Game-steem-DroidDeck-M23-debug.apk`.
+Actions ejecuta los controles en PR y en main: Gradle assembleDebug, firma de desarrollo estable, inspección de package `com.droiddeck.console`, contrato real de Steam Legacy, extracción con Java limitado a 64 MiB, prueba Android de JNI y pantalla pequeña, y análisis. El artefacto M24 se llama `Game-steem-DroidDeck-M24-debug.apk`.
 
 La clave de desarrollo pública permite actualizar entre builds, pero no es una clave privada de publicación. Un build verde verifica compilación y empaquetado; no sustituye una prueba de Steam y juegos en un teléfono real.
 

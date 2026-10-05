@@ -59,6 +59,9 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
 
     private volatile String linuxProcessSummary = "[sin datos]";
     private volatile int linuxProcessCount;
+    private final ProcessCpuActivity cpuActivity = new ProcessCpuActivity();
+    private boolean wasStalled;
+    private boolean startupLogsCollected;
     private String lastLinuxProcessSignature = "";
     private String lastWindowsProcessSignature = "";
 
@@ -137,7 +140,6 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
 
             if (count == 0 || index >= count - 1) {
                 markProcessActivityIfChanged();
-                publishCombinedTelemetry();
             }
         }
     }
@@ -162,21 +164,31 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
         List<ProcessHelper.PStat> children = ProcessHelper.getChildProcesses();
         StringBuilder names = new StringBuilder();
         int count = 0;
+        boolean cpuBusy = false;
+        cpuActivity.beginSample();
 
         for (ProcessHelper.PStat process : children) {
             String name = process.name == null ? "" : process.name;
             String lower = name.toLowerCase(Locale.US);
             if (process.guestProcess || lower.contains("box64") || lower.contains("steam")
                     || lower.contains("wine") || lower.contains("winhandler")) {
+                if (process.state == ProcessHelper.PState.ZOMBIE || process.state == ProcessHelper.PState.DEAD) continue;
                 count++;
+                try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader("/proc/" + process.pid + "/stat"))) {
+                    String stat = reader.readLine();
+                    if (stat != null) cpuBusy |= cpuActivity.observe(stat);
+                }
+                catch (java.io.IOException ignored) { /* Exited or not readable. */ }
+                if (names.length() >= 220) continue;
                 if (names.length() > 0) names.append(", ");
                 names.append(name);
                 if (names.length() > 220) {
                     names.append("…");
-                    break;
                 }
             }
         }
+        cpuActivity.endSample();
+        if (cpuBusy) lastActivityAt = android.os.SystemClock.elapsedRealtime();
 
         linuxProcessCount = count;
         linuxProcessSummary = names.length() > 0 ? names.toString() : "[sin procesos guest visibles]";
@@ -410,7 +422,7 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
         }
 
         if (stalled) {
-            diagnosis = "POSIBLE BLOQUEO REAL · 60 s sin red, archivos nuevos ni cambios de procesos";
+            diagnosis = "Sin actividad observable durante 60 s. Puedes ver la pantalla o volver y reintentar.";
         }
 
         overlay.waitingTelemetry(
@@ -431,8 +443,34 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
                 stalled
         );
 
-        if (stalled && idleMs < STALL_MS + 1500L) {
-            ConsoleLogStore.warn("WATCHDOG: posible bloqueo real detectado.");
+        if (stalled && !wasStalled) {
+            ConsoleLogStore.warn("WATCHDOG · sin actividad observable · Windows=" + windowsSnapshot.size()
+                    + " · Linux=" + linuxProcessCount + " · WinHandler=" + winHandlerResponded
+                    + " · procesos=" + names);
+        }
+        wasStalled = stalled;
+        if (!startupLogsCollected && (stalled || elapsed >= 180_000L)) {
+            startupLogsCollected = true;
+            fileScanner.execute(this::collectStartupLogs);
+        }
+    }
+
+    private void collectStartupLogs() {
+        File steam = new File(activity.getContainer().getRootDir(), ".wine/drive_c/Program Files (x86)/Steam");
+        for (String name : new String[]{"bootstrap_log.txt", "cef_log.txt"}) {
+            File file = new File(steam, "logs/" + name);
+            try {
+                if (!file.getCanonicalPath().startsWith(steam.getCanonicalPath() + File.separator) || !file.isFile()) continue;
+                try (java.io.RandomAccessFile input = new java.io.RandomAccessFile(file, "r")) {
+                    int size = (int)Math.min(4096L, input.length());
+                    byte[] bytes = new byte[size];
+                    input.seek(Math.max(0L, input.length() - size));
+                    input.readFully(bytes);
+                    ConsoleLogStore.warn("STEAM LOG · " + name + " · últimos " + size + " bytes\n"
+                            + new String(bytes, java.nio.charset.StandardCharsets.UTF_8));
+                }
+            }
+            catch (java.io.IOException error) { ConsoleLogStore.warn("No se pudo leer " + name + ": " + error.getMessage()); }
         }
     }
 

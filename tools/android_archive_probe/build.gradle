@@ -14,7 +14,7 @@ android {
         path '../../winlator-app/app/src/main/cpp/steamarchive/CMakeLists.txt'
     } }
     sourceSets.main {
-        java.srcDirs += 'generated/java'
+        java.srcDirs += ['generated/java', 'stubs']
         res.srcDirs = ['../../overlay/app/src/main/res']
     }
 }
