@@ -124,6 +124,24 @@ def apply_runtime_startup_fixes(src):
         }
 
         winHandler.start();""")
+    # Boot the exact desktop command of a normal Winlator container. The existing
+    # WinHandler queue delivers EXEC only after the Windows helper sends INIT.
+    text = replace_once(text, '            if (intent.hasExtra("exec_dos_path")) {',
+                        '            if (isDroidDeckSteamDesktop()) {\n                // Start wfm.exe below, as in the stock container desktop.\n            }\n            else if (intent.hasExtra("exec_dos_path")) {')
+    text = replace_once(text, "    private String getWineStartCommand() {", """    private boolean isDroidDeckSteamDesktop() {
+        return droidDeckConsoleMode && "steam_client".equals(getIntent().getStringExtra("droiddeck_purpose"));
+    }
+
+    private String getWineStartCommand() {""")
+    text = replace_once(text, "        winHandler.start();", """        winHandler.start();
+        if (isDroidDeckSteamDesktop()) {
+            String steamPath = getIntent().getStringExtra("exec_dos_path");
+            if (!"C:\\\\Program Files (x86)\\\\Steam\\\\steam.exe".equals(steamPath)) {
+                throw new IllegalArgumentException("Ruta Steam inválida");
+            }
+            ConsoleLogStore.info("LAUNCH · escritorio shell iniciado; Steam en cola hasta INIT de winhandler");
+            winHandler.exec(steamPath, null);
+        }""")
     activity.write_text(text)
 
     handler = java / "winhandler/WinHandler.java"

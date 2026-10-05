@@ -50,6 +50,7 @@ public final class ConsoleBootstrapController {
     private boolean prepared;
     private boolean preparing;
     private boolean runtimeActive;
+    private boolean runtimeFailed;
     private boolean installRequested;
 
     public ConsoleBootstrapController(AppCompatActivity activity, Listener listener) {
@@ -99,7 +100,7 @@ public final class ConsoleBootstrapController {
 
         configureRuntimeLogging();
 
-        ConsoleLogStore.info("BOOT · DroidDeck M27 · Winlator 11.2 · instalación Steam Legacy nativa Android");
+        ConsoleLogStore.info("BOOT · DroidDeck M28 · Winlator 11.2 · instalación Steam Legacy nativa Android");
         AndroidRuntimeDiagnostics.record(activity);
         update("system", "Sistema", "Verificando RootFS de Winlator 11.2", BootstrapStep.State.RUNNING, 5);
 
@@ -138,7 +139,7 @@ public final class ConsoleBootstrapController {
     }
 
     public void refreshAfterResume() {
-        if (!prepared || runtimeActive || steamContainer == null) return;
+        if (!prepared || runtimeActive || runtimeFailed || steamContainer == null) return;
 
         File steam = findSteamExecutable(steamContainer);
         if (steam != null) {
@@ -430,15 +431,16 @@ public final class ConsoleBootstrapController {
         );
 
         ConsoleLogStore.info("LAUNCH · steam.exe: " + steam.getAbsolutePath());
-        ConsoleLogStore.info("LAUNCH · Box64 aplicará el bloque [steam.exe] de default.box64rc.");
+        ConsoleLogStore.info("LAUNCH · escritorio shell de Winlator; Steam se enviará tras INIT de winhandler.");
 
         configureRuntimeLogging();
         Intent intent = new Intent(activity, XServerDisplayActivity.class);
         intent.putExtra("container_id", steamContainer.id);
-        intent.putExtra("exec_path", steam.getAbsolutePath());
+        intent.putExtra("exec_dos_path", "C:\\Program Files (x86)\\Steam\\steam.exe");
         intent.putExtra("droiddeck_console", true);
         intent.putExtra("droiddeck_purpose", "steam_client");
 
+        runtimeFailed = false;
         runtimeActive = true;
         activity.startActivityForResult(intent, REQUEST_RUNTIME);
     }
@@ -465,7 +467,8 @@ public final class ConsoleBootstrapController {
                 update("launch", "Inicio", "Steam cerrado", BootstrapStep.State.DONE, 100);
             }
             else {
-                fail("launch", "Steam terminó con código " + status + " · revisa la consola real");
+                runtimeFailed = true;
+                fail("launch", "El entorno terminó con código " + status + " · abre Diagnóstico");
             }
         }
     }
