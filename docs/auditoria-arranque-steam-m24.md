@@ -22,6 +22,7 @@ El perfil Performance también es el predeterminado de Container en esa base. El
 | Aviso repetido y espera sin salida, porcentaje 95 constante | Aviso por episodio; tiempo de espera, pantalla real, volver y compartir registro |
 | Telemetría quedaba fuera de pantalla horizontal corta | Columna desplazable y acciones visibles |
 | WINEDEBUG generado como +err | Usa clase `-all,err+all`; detalle opcional. +err no es err+all, pero no prueba que antes todos los errores se suprimieran |
+| Cierre concurrente del monitor y envío de tareas | Se maneja rechazo por cierre; una preparación que detecta Activity cerrada detiene sus componentes |
 | Preparación de entorno sin manejo visible de excepción | Error registrado y retorno al launcher; hilo termina tras preparar |
 
 El monitor recoge una vez los últimos 4 KiB de bootstrap_log.txt y cef_log.txt, si existen, después de falta de actividad o tres minutos sin ventana. No recorre juegos ni userdata para exportar su contenido. Compartir requiere pulsar el botón de Android.

@@ -76,11 +76,11 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
                 lastProcessScanAt = now;
                 if (!processScanRunning) {
                     processScanRunning = true;
-                    fileScanner.execute(() -> {
+                    if (!submitBackground(() -> {
                         try { if (running) sampleLinuxProcesses(); }
                         catch (Exception error) { ConsoleLogStore.warn("Monitor de procesos: " + error.getMessage()); }
                         finally { processScanRunning = false; }
-                    });
+                    })) processScanRunning = false;
                 }
                 winHandler.listProcesses();
             }
@@ -218,7 +218,7 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
 
         fileScanRunning = true;
         lastFileScanAt = now;
-        fileScanner.execute(() -> {
+        if (!submitBackground(() -> {
             try {
                 FileSnapshot snapshot = scanSteamFiles();
                 long finishedAt = android.os.SystemClock.elapsedRealtime();
@@ -254,7 +254,16 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
             finally {
                 fileScanRunning = false;
             }
-        });
+        })) fileScanRunning = false;
+    }
+
+    private boolean submitBackground(Runnable task) {
+        if (!running) return false;
+        try { fileScanner.execute(task); return true; }
+        catch (java.util.concurrent.RejectedExecutionException ignored) {
+            // A window callback may stop the monitor while the UI tick submits work.
+            return false;
+        }
     }
 
     private FileSnapshot scanSteamFiles() {
@@ -451,7 +460,7 @@ public final class SteamRuntimeWatchdog implements OnGetProcessInfoListener {
         wasStalled = stalled;
         if (!startupLogsCollected && (stalled || elapsed >= 180_000L)) {
             startupLogsCollected = true;
-            fileScanner.execute(this::collectStartupLogs);
+            submitBackground(this::collectStartupLogs);
         }
     }
 

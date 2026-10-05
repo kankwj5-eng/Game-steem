@@ -117,6 +117,13 @@ def apply_runtime_startup_fixes(src):
                 runOnUiThread(() -> { if (!isFinishing() && !isDestroyed()) finishDroidDeckRuntime(126); });
             }
         }, "droiddeck-runtime-setup").start();""")
+    text = replace_once(text, "        environment.startEnvironmentComponents();\n\n        winHandler.start();", """        environment.startEnvironmentComponents();
+        if (isFinishing() || isDestroyed()) {
+            environment.stopEnvironmentComponents();
+            return;
+        }
+
+        winHandler.start();""")
     activity.write_text(text)
 
     handler = java / "winhandler/WinHandler.java"
