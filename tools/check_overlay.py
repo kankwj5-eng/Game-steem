@@ -51,14 +51,14 @@ for token in [
     "droiddeck_detailed_logs",
     'detailed ? "warn,err,fixme" : "err"',
     'detailed ? 1 : 0',
-    "BOOT · DroidDeck M24 ·",
+    "BOOT · DroidDeck M25 ·",
     "1400L * 1024L * 1024L",
     "1.4 GB libres",
 ]:
     if token not in controller:
-        raise SystemExit(f"controlador M24 incompleto: falta {token}")
+        raise SystemExit(f"controlador M25 incompleto: falta {token}")
 
-# M24 must not regress to hidden Windows installers.
+# M25 must not regress to hidden Windows installers.
 for forbidden in [
     "SteamSetup.exe",
     "steam_install",
@@ -67,7 +67,7 @@ for forbidden in [
     "waitForSteamAfterInstall",
 ]:
     if forbidden in controller:
-        raise SystemExit(f"controlador M24 conserva ruta antigua prohibida: {forbidden}")
+        raise SystemExit(f"controlador M25 conserva ruta antigua prohibida: {forbidden}")
 
 installer = (root / "overlay/app/src/main/java/com/winlator/console/SteamLegacyInstaller.java").read_text()
 for token in [
@@ -132,7 +132,7 @@ for token in [
     "sessionActive.get() || installerActive.get()",
 ]:
     if token not in foreground:
-        raise SystemExit(f"ForegroundService M24 incompleto: falta {token}")
+        raise SystemExit(f"ForegroundService M25 incompleto: falta {token}")
 
 activity = (root / "overlay/app/src/main/java/com/winlator/ConsoleLauncherActivity.java").read_text()
 for token in [
@@ -143,7 +143,9 @@ for token in [
     "controller.destroy()",
     "setDiagnosticsVisible",
     "CBDetailedLogs",
-    "ConsoleLogStore.snapshot()",
+    "logUiActive",
+    "protected void onPause()",
+    "ConsoleLogStore.addListener(this)",
 ]:
     if token not in activity:
         raise SystemExit(f"launcher incompleto: falta {token}")
@@ -177,6 +179,8 @@ for token in [
     "Ventana de Steam",
     "waitingTelemetry",
     "Espera ·",
+    "detachLogListener",
+    "closed || !logSubscribed",
 ]:
     if token not in runtime_overlay:
         raise SystemExit(f"overlay runtime incompleto: falta {token}")
@@ -191,13 +195,17 @@ for token in [
     "postDelayed(uiNotifier",
     "public static synchronized void flush()",
     "MAX_SESSION_FILES = 8",
+    "MAX_BUFFER_CHARS = 64 * 1024",
+    "new RuntimeLogThrottle(40)",
+    "listeners.isEmpty() || uiNotifyScheduled",
+    "setDetailedRuntimeLogging",
     "pruneOldLogs",
     "Arrays.sort",
     "UI_NOTIFY_INTERVAL_MS = 250L",
     "\"RUNTIME\".equals(level)",
 ]:
     if token not in console_log:
-        raise SystemExit(f"log M24 no optimizado: falta {token}")
+        raise SystemExit(f"log M25 no optimizado: falta {token}")
 
 security_fixes = (root / "tools/native_security_fixes.py").read_text()
 for token in [
@@ -218,7 +226,7 @@ patcher = (root / "tools/apply_overlay.py").read_text()
 for token in [
     "/data/data/com.droiddeck.console/",
     "runOnUiThread",
-    'versionName "1.0.0-m24"',
+    'versionName "1.0.0-m25"',
     "SteamRuntimeWatchdog",
     "droidDeckSteamWatchdog = new SteamRuntimeWatchdog",
     'android:label="DroidDeck"',
@@ -239,13 +247,13 @@ for token in [
     "xz:1.12",
 ]:
     if token not in patcher:
-        raise SystemExit(f"parche M24 incompleto: falta {token}")
+        raise SystemExit(f"parche M25 incompleto: falta {token}")
 
 launcher_xml = (root / "overlay/app/src/main/res/layout/console_launcher_activity.xml").read_text()
 runtime_xml = (root / "overlay/app/src/main/res/layout/droiddeck_runtime_overlay.xml").read_text()
 for token in ['@drawable/ic_droiddeck_logo', 'DROIDDECK']:
     if token not in launcher_xml or token not in runtime_xml:
-        raise SystemExit(f"branding M24 incompleto: falta {token}")
+        raise SystemExit(f"branding M25 incompleto: falta {token}")
 
 native_archive = (root / "overlay/app/src/main/cpp/steamarchive/steamarchive.c").read_text()
 for token in ["DECODER_LIMIT", "budget_alloc", "SzArEx_Extract", "O_NOFOLLOW", "fsync(fd)", "bytes != SzArEx_GetFileSize"]:
@@ -254,4 +262,4 @@ for token in ["DECODER_LIMIT", "budget_alloc", "SzArEx_Extract", "O_NOFOLLOW", "
 if "SevenZFile" in installer:
     raise SystemExit("Steam vuelve a asignar el diccionario 7z en el heap Java")
 
-print("Overlay M24 válido: instalación Steam Legacy nativa, telemetría y seguridad integradas.")
+print("Overlay M25 válido: instalación Steam Legacy nativa, telemetría y seguridad integradas.")

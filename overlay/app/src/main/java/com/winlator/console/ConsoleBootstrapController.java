@@ -99,7 +99,7 @@ public final class ConsoleBootstrapController {
 
         configureRuntimeLogging();
 
-        ConsoleLogStore.info("BOOT · DroidDeck M24 · Winlator 11.2 · instalación Steam Legacy nativa Android");
+        ConsoleLogStore.info("BOOT · DroidDeck M25 · Winlator 11.2 · instalación Steam Legacy nativa Android");
         update("system", "Sistema", "Verificando RootFS de Winlator 11.2", BootstrapStep.State.RUNNING, 5);
 
         RootFS root = RootFS.find(activity);
@@ -406,6 +406,7 @@ public final class ConsoleBootstrapController {
     private void configureRuntimeLogging() {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(activity);
         boolean detailed = prefs.getBoolean("droiddeck_detailed_logs", false);
+        ConsoleLogStore.setDetailedRuntimeLogging(detailed);
         prefs.edit().putBoolean("enable_wine_debug", true)
                 .putString("wine_debug_channels", detailed ? "warn,err,fixme" : "err")
                 .putInt("box64_logs", detailed ? 1 : 0).apply();

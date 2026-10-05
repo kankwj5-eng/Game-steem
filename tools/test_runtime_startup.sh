@@ -7,5 +7,8 @@ trap 'rm -rf "$CLASSES"' EXIT
   "$ROOT/overlay/app/src/main/java/com/winlator/console/ObservedProcess.java" \
   "$ROOT/overlay/app/src/main/java/com/winlator/console/RuntimeStartupPolicy.java" \
   "$ROOT/overlay/app/src/main/java/com/winlator/console/ProcessCpuActivity.java" \
+  "$ROOT/overlay/app/src/main/java/com/winlator/console/RuntimeLogThrottle.java" \
+  "$ROOT/tools/tests/RuntimeLogThrottleTest.java" \
   "$ROOT/tools/tests/RuntimeStartupTest.java"
 java -cp "$CLASSES" com.winlator.console.RuntimeStartupTest
+java -cp "$CLASSES" com.winlator.console.RuntimeLogThrottleTest

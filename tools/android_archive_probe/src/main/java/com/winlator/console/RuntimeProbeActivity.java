@@ -39,14 +39,30 @@ public final class RuntimeProbeActivity extends Activity {
                     try {
                         if (!findViewById(R.id.TVRuntimeTelemetry).getGlobalVisibleRect(new Rect()))
                             throw new AssertionError("Telemetry cannot be reached");
+                        TextView runtimeLog = findViewById(R.id.TVRuntimeLog);
+                        AtomicInteger hiddenUpdates = new AtomicInteger();
+                        runtimeLog.addTextChangedListener(new android.text.TextWatcher() {
+                            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                            public void onTextChanged(CharSequence s, int start, int before, int count) { hiddenUpdates.incrementAndGet(); }
+                            public void afterTextChanged(android.text.Editable s) {}
+                        });
                         findViewById(R.id.BTRuntimeShow).performClick();
                         if (findViewById(R.id.TVRuntimePercent).isShown()) throw new AssertionError("Screen still covered");
                         if (cancelled.get() != 0) throw new AssertionError("Manual view cancels process");
                         findViewById(R.id.BTRuntimeBack).performClick();
                         findViewById(R.id.BTRuntimeBack).performClick();
                         if (cancelled.get() != 1) throw new AssertionError("Cancel callback must be once");
-                        overlay.close();
-                        save("runtime-ui.txt", "PASS runtime UI at ten minutes");
+                        ConsoleLogStore.setDetailedRuntimeLogging(false);
+                        for (int i = 0; i < 10000; i++) ConsoleLogStore.RUNTIME_CALLBACK.call("Wine flood " + i);
+                        overlay.onLogChanged("late hidden callback");
+                        getWindow().getDecorView().postDelayed(() -> {
+                            try {
+                                if (hiddenUpdates.get() != 0) throw new AssertionError("Hidden console still relayouts logs");
+                                overlay.close();
+                                testLogBudget();
+                                testReadyConsole();
+                            } catch (Throwable error) { save("runtime-ui.txt", "FAIL " + error); }
+                        }, 400);
                     } catch (Throwable error) { save("runtime-ui.txt", "FAIL " + error); }
                 });
             } catch (Throwable error) { save("runtime-ui.txt", "FAIL " + error); }
@@ -55,10 +71,44 @@ public final class RuntimeProbeActivity extends Activity {
             try {
                 RuntimeStartupTest.main(new String[]{"/system/bin/sh"});
                 testProcessHelper();
+                RuntimeLogThrottleTest.main(new String[0]);
                 save("runtime-result.txt", "PASS real Android process output, exit and failure");
             } catch (Throwable error) { save("runtime-result.txt", "FAIL " + error); }
         }, "runtime-probe").start();
     }
+    private void testReadyConsole() {
+        RuntimeConsoleOverlay readyOverlay = new RuntimeConsoleOverlay(this, () -> {});
+        TextView log = findViewById(R.id.TVRuntimeLog);
+        AtomicInteger updates = new AtomicInteger();
+        log.addTextChangedListener(new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            public void onTextChanged(CharSequence s, int start, int before, int count) { updates.incrementAndGet(); }
+            public void afterTextChanged(android.text.Editable s) {}
+        });
+        readyOverlay.ready("Ventana simulada para probar el cierre de la consola");
+        for (int i = 0; i < 1000; i++) ConsoleLogStore.RUNTIME_CALLBACK.call("Wine after-ready " + i);
+        readyOverlay.onLogChanged("late ready callback");
+        getWindow().getDecorView().postDelayed(() -> {
+            try {
+                if (updates.get() != 0) throw new AssertionError("Ready console still relayouts logs");
+                readyOverlay.close();
+                save("runtime-ui.txt", "PASS runtime UI at ten minutes; manual/ready hidden updates=0; buffer <=64 Ki chars; detailed logs preserved");
+            } catch (Throwable error) { save("runtime-ui.txt", "FAIL " + error); }
+        }, 400);
+    }
+
+    private void testLogBudget() {
+        String large = new String(new char[4000]).replace('\0', 'x');
+        for (int i = 0; i < 50; i++) ConsoleLogStore.append("PKG", large + i);
+        if (ConsoleLogStore.snapshot().length() > 65536) throw new AssertionError("Log buffer exceeds 64 KiB chars");
+        ConsoleLogStore.setDetailedRuntimeLogging(true);
+        for (int i = 0; i < 100; i++) ConsoleLogStore.RUNTIME_CALLBACK.call("Wine [detail-line-" + i + "]");
+        String full = ConsoleLogStore.snapshot();
+        for (int i = 0; i < 100; i++)
+            if (!full.contains("[detail-line-" + i + "]")) throw new AssertionError("Detailed mode lost record " + i);
+        ConsoleLogStore.setDetailedRuntimeLogging(false);
+    }
+
     private void testProcessHelper() throws Exception {
         java.util.concurrent.CountDownLatch exited = new java.util.concurrent.CountDownLatch(1);
         java.util.List<String> lines = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
