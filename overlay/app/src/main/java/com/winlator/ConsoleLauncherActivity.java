@@ -44,6 +44,7 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
     private TextView currentPercent;
     private ProgressBar currentProgress;
     private TextView logView;
+    private boolean logUiActive;
     private TextView logPath;
     private ScrollView logScroll;
     private View errorActions;
@@ -192,8 +193,17 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
     @Override
     protected void onResume() {
         super.onResume();
+        logUiActive = true;
+        if (logScroll != null && logScroll.getVisibility() == View.VISIBLE) ConsoleLogStore.addListener(this);
         AppUtils.hideSystemUI(this);
         if (controller != null && !permissionsBlocked) controller.refreshAfterResume();
+    }
+
+    @Override
+    protected void onPause() {
+        logUiActive = false;
+        ConsoleLogStore.removeListener(this);
+        super.onPause();
     }
 
     @Override
@@ -302,7 +312,7 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
     @Override
     public void onLogChanged(String fullLog) {
         runOnUiThread(() -> {
-            if (logScroll.getVisibility() != View.VISIBLE) return;
+            if (!logUiActive || logScroll.getVisibility() != View.VISIBLE) return;
             logView.setText(fullLog.isEmpty() ? "Esperando actividad…" : fullLog);
             logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
         });
@@ -314,9 +324,8 @@ public class ConsoleLauncherActivity extends AppCompatActivity implements Consol
         detailedLogs.setVisibility(visibility);
         logScroll.setVisibility(visibility);
         ((Button)findViewById(R.id.BTDiagnostics)).setText(visible ? "OCULTAR REGISTRO" : "DIAGNÓSTICO");
-        if (visible) {
+        if (visible && logUiActive) {
             ConsoleLogStore.addListener(this);
-            onLogChanged(ConsoleLogStore.snapshot());
         }
         else ConsoleLogStore.removeListener(this);
     }

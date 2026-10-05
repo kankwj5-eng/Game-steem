@@ -19,6 +19,8 @@ import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public final class ConsoleLogStore {
+    private static final RuntimeLogThrottle runtimeThrottle = new RuntimeLogThrottle(40);
+    private static volatile boolean detailedRuntimeLogs;
     // One callback for the complete runtime lifetime, including errors before/after the first window.
     public static final Callback<String> RUNTIME_CALLBACK = line -> {
         if (line == null) return;
@@ -29,13 +31,17 @@ public final class ConsoleLogStore {
                 || lower.contains("err:") || lower.contains("error") || lower.contains("warn")
                 || lower.contains("fail") || lower.contains("cef")) {
             if (trimmed.length() > 600) trimmed = trimmed.substring(0, 600) + "…";
-            append("RUNTIME", trimmed);
+            String accepted = detailedRuntimeLogs ? trimmed : runtimeThrottle.accept(trimmed, SystemClock.elapsedRealtime());
+            if (accepted != null) append("RUNTIME", accepted);
         }
     };
 
     public interface Listener { void onLogChanged(String fullLog); }
 
     private static final int MAX_LINES = 900;
+    private static final int MAX_BUFFER_CHARS = 64 * 1024;
+    private static final int MAX_MESSAGE_CHARS = 16 * 1024;
+    private static int bufferedChars;
     private static final int MAX_SESSION_FILES = 8;
     private static final int FILE_LOG_FLUSH_BATCH = 32;
     private static final long FILE_LOG_FLUSH_MS = 750L;
@@ -57,6 +63,7 @@ public final class ConsoleLogStore {
         final String current;
         synchronized (ConsoleLogStore.class) {
             uiNotifyScheduled = false;
+            if (listeners.isEmpty()) return;
             current = snapshotLocked();
         }
         for (Listener listener : listeners) listener.onLogChanged(current);
@@ -101,12 +108,16 @@ public final class ConsoleLogStore {
     public static synchronized void append(String level, String message) {
         String safe = message == null ? "" : message.trim();
         if (safe.isEmpty()) return;
+        if (safe.length() > MAX_MESSAGE_CHARS) safe = safe.substring(0, MAX_MESSAGE_CHARS) + "…";
 
         String safeLevel = level == null || level.trim().isEmpty() ? "INFO" : level.trim();
         String line = LINE_TIME.format(new Date()) + "  " + safeLevel + "  " + safe;
 
         lines.addLast(line);
-        while (lines.size() > MAX_LINES) lines.removeFirst();
+        bufferedChars += line.length() + 1;
+        while (lines.size() > MAX_LINES || bufferedChars > MAX_BUFFER_CHARS) {
+            bufferedChars -= lines.removeFirst().length() + 1;
+        }
 
         writeToDiskLocked(safeLevel, line);
         scheduleUiNotificationLocked();
@@ -137,9 +148,14 @@ public final class ConsoleLogStore {
     }
 
     private static void scheduleUiNotificationLocked() {
-        if (uiNotifyScheduled) return;
+        if (listeners.isEmpty() || uiNotifyScheduled) return;
         uiNotifyScheduled = true;
         main.postDelayed(uiNotifier, UI_NOTIFY_INTERVAL_MS);
+    }
+
+    public static void setDetailedRuntimeLogging(boolean enabled) {
+        detailedRuntimeLogs = enabled;
+        runtimeThrottle.reset();
     }
 
     public static void info(String message) { append("INFO", message); }
@@ -158,6 +174,8 @@ public final class ConsoleLogStore {
     }
 
     public static synchronized void flush() {
+        String summary = runtimeThrottle.takeSummary();
+        if (summary != null) append("RUNTIME", summary);
         if (sessionWriter == null) return;
         try {
             sessionWriter.flush();
@@ -174,7 +192,9 @@ public final class ConsoleLogStore {
     public static void addListener(Listener listener) {
         if (listener == null) return;
         if (!listeners.contains(listener)) listeners.add(listener);
-        main.post(() -> listener.onLogChanged(snapshot()));
+        main.post(() -> {
+            if (listeners.contains(listener)) listener.onLogChanged(snapshot());
+        });
     }
 
     public static void removeListener(Listener listener) {

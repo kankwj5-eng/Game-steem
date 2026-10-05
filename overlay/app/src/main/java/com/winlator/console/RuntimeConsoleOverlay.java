@@ -27,7 +27,8 @@ public final class RuntimeConsoleOverlay implements ConsoleLogStore.Listener {
     private final ProgressBar progress;
     private final ScrollView logScroll;
     private volatile boolean closed;
-    private boolean dismissed;
+    private volatile boolean dismissed;
+    private volatile boolean logSubscribed = true;
     private boolean cancelled;
 
     public RuntimeConsoleOverlay(Activity activity, Runnable cancel) {
@@ -48,6 +49,7 @@ public final class RuntimeConsoleOverlay implements ConsoleLogStore.Listener {
 
         root.findViewById(R.id.BTRuntimeShow).setOnClickListener(view -> {
             dismissed = true;
+            detachLogListener();
             root.setVisibility(View.GONE);
             ConsoleLogStore.info("Pantalla del motor abierta manualmente; Steam todavía no está confirmado.");
         });
@@ -122,7 +124,7 @@ public final class RuntimeConsoleOverlay implements ConsoleLogStore.Listener {
                                  int fileCount, long fileBytes, double fileWriteBytesPerSecond,
                                  String lastFile, long idleMs, boolean winHandlerResponded,
                                  boolean stalled) {
-        if (closed) return;
+        if (closed || dismissed) return;
 
         final long seconds = Math.max(0L, elapsedMs / 1000L);
         final long idleSeconds = Math.max(0L, idleMs / 1000L);
@@ -184,6 +186,8 @@ public final class RuntimeConsoleOverlay implements ConsoleLogStore.Listener {
 
     public void ready(String message) {
         if (closed) return;
+        detachLogListener();
+        ConsoleLogStore.flush();
         stage("Listo", message, 100);
         activity.runOnUiThread(() -> telemetry.setText("Steam creó una ventana real en XServer."));
         activity.runOnUiThread(() -> {
@@ -201,18 +205,23 @@ public final class RuntimeConsoleOverlay implements ConsoleLogStore.Listener {
     public void close() {
         if (closed) return;
         closed = true;
-        ConsoleLogStore.removeListener(this);
+        detachLogListener();
         activity.runOnUiThread(() -> {
             ViewGroup parent = (ViewGroup)root.getParent();
             if (parent != null) parent.removeView(root);
         });
     }
 
+    private void detachLogListener() {
+        logSubscribed = false;
+        ConsoleLogStore.removeListener(this);
+    }
+
     @Override
     public void onLogChanged(String fullLog) {
-        if (closed) return;
+        if (closed || !logSubscribed) return;
         activity.runOnUiThread(() -> {
-            if (closed) return;
+            if (closed || !logSubscribed) return;
             log.setText(fullLog == null || fullLog.isEmpty() ? "Esperando actividad real del motor…" : fullLog);
             logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
         });
