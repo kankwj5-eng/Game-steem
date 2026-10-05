@@ -26,9 +26,11 @@ public final class RuntimeConsoleOverlay implements ConsoleLogStore.Listener {
     private final TextView telemetry;
     private final ProgressBar progress;
     private final ScrollView logScroll;
-    private boolean closed;
+    private volatile boolean closed;
+    private boolean dismissed;
+    private boolean cancelled;
 
-    public RuntimeConsoleOverlay(Activity activity) {
+    public RuntimeConsoleOverlay(Activity activity, Runnable cancel) {
         this.activity = activity;
         this.root = LayoutInflater.from(activity).inflate(R.layout.droiddeck_runtime_overlay, null, false);
         this.stage = root.findViewById(R.id.TVRuntimeStage);
@@ -44,11 +46,32 @@ public final class RuntimeConsoleOverlay implements ConsoleLogStore.Listener {
         this.stepWindow = root.findViewById(R.id.TVRuntimeWindow);
         this.telemetry = root.findViewById(R.id.TVRuntimeTelemetry);
 
+        root.findViewById(R.id.BTRuntimeShow).setOnClickListener(view -> {
+            dismissed = true;
+            root.setVisibility(View.GONE);
+            ConsoleLogStore.info("Pantalla del motor abierta manualmente; Steam todavía no está confirmado.");
+        });
+        root.findViewById(R.id.BTRuntimeBack).setEnabled(false);
+        root.findViewById(R.id.BTRuntimeBack).setOnClickListener(view -> {
+            if (cancelled) return;
+            cancelled = true;
+            ConsoleLogStore.warn("Espera cancelada por el usuario.");
+            cancel.run();
+        });
+        root.findViewById(R.id.BTRuntimeShare).setOnClickListener(view -> {
+            String snapshot = ConsoleLogStore.snapshot();
+            if (snapshot.length() > 24000) snapshot = snapshot.substring(snapshot.length() - 24000);
+            android.content.Intent send = new android.content.Intent(android.content.Intent.ACTION_SEND);
+            send.setType("text/plain");
+            send.putExtra(android.content.Intent.EXTRA_TEXT, snapshot);
+            activity.startActivity(android.content.Intent.createChooser(send, "Compartir registro de Steam"));
+        });
+
         activity.addContentView(root, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
         ));
-        root.bringToFront();
+        if (!dismissed) root.bringToFront();
         ConsoleLogStore.addListener(this);
         stage("Motor", "Preparando entorno Windows", 4);
     }
@@ -64,7 +87,8 @@ public final class RuntimeConsoleOverlay implements ConsoleLogStore.Listener {
             progress.setIndeterminate(false);
             progress.setProgress(safe);
             updateSteps(safe);
-            root.bringToFront();
+            root.findViewById(R.id.BTRuntimeBack).setEnabled(safe >= 95);
+            if (!dismissed) root.bringToFront();
         });
         ConsoleLogStore.info("ARRANQUE " + safe + "% · " + title + " · " + message);
     }
@@ -111,9 +135,10 @@ public final class RuntimeConsoleOverlay implements ConsoleLogStore.Listener {
         activity.runOnUiThread(() -> {
             if (closed) return;
 
-            stage.setText(stalled ? "Steam · posible bloqueo real" : "Steam");
+            root.findViewById(R.id.BTRuntimeBack).setEnabled(true);
+            stage.setText(stalled ? "Steam · sin ventana" : "Steam");
             detail.setText(diagnosis);
-            percent.setText("95% · " + seconds + " s");
+            percent.setText("Espera · " + seconds + " s");
             progress.setIndeterminate(true);
 
             telemetry.setText(
@@ -138,7 +163,7 @@ public final class RuntimeConsoleOverlay implements ConsoleLogStore.Listener {
                 telemetry.setTextColor(Color.parseColor("#C9D3EB"));
             }
 
-            root.bringToFront();
+            if (!dismissed) root.bringToFront();
         });
     }
 
