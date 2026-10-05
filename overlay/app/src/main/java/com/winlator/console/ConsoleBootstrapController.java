@@ -99,7 +99,8 @@ public final class ConsoleBootstrapController {
 
         configureRuntimeLogging();
 
-        ConsoleLogStore.info("BOOT · DroidDeck M25 · Winlator 11.2 · instalación Steam Legacy nativa Android");
+        ConsoleLogStore.info("BOOT · DroidDeck M26 · Winlator 11.2 · instalación Steam Legacy nativa Android");
+        AndroidRuntimeDiagnostics.record(activity);
         update("system", "Sistema", "Verificando RootFS de Winlator 11.2", BootstrapStep.State.RUNNING, 5);
 
         RootFS root = RootFS.find(activity);
