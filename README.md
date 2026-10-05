@@ -10,8 +10,9 @@ M21 extrae en staging, verifica los tamaños de todos los archivos y confirma el
 
 Los archivos y directorios se sincronizan antes de confirmar la instalación para reducir el riesgo por apagados. Esto añade coste a la primera extracción; el arranque habitual solo comprueba el marcador y seis binarios. Tras una instalación verificada se elimina la caché del paquete.
 
-## Arranque y pantalla · M27
+## Arranque y pantalla · M28
 
+- M28 recupera el escritorio normal de Winlator, inicia Steam después de INIT del helper y conserva los errores de arranque. Retira la limpieza de procesos hijos de M26. [Cambios y límites](docs/arranque-winlator-m28.md).
 - M27 añade una opción experimental en Diagnóstico para reutilizar traducciones de Box64 en próximos inicios, con caché privada y objetivo de 128 MiB de disco. Conserva la configuración inicial sin caché. [Uso y pruebas M27](docs/cache-traduccion-m27.md).
 - M26 recupera procesos del entorno Steam marcados por la app al iniciar y cerrar; conserva los procesos sin marcador, incluido el instalador. Registra la RAM disponible y las restricciones de procesos hijos sin cambiar ajustes del sistema. [Recuperación y límites M26](docs/recuperacion-procesos-m26.md).
 - La consola se desconecta al ocultarse; el launcher deja de recibir logs en segundo plano. El historial visual se limita a 64 Ki caracteres y el modo normal agrupa repetidos con presupuesto de 40 líneas/s; el detalle opcional conserva los registros. [Pruebas y límites de rendimiento M25](docs/rendimiento-m25.md).
